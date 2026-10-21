@@ -25,8 +25,8 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 
 ## Étapes de la phase 1
 1. Plan ✔ 2. Carte, zoom, projections ✔ 3. Mode « où est ce pays » ✔ (sélection puis validation) 4. Mode saisie du nom ✔ (`js/moteur/reponses.js`)
-5. Capitales dans les deux sens ✔ (choix des cas délicats validés le 21/10/2026 : plusieurs réponses seulement pour les capitales multiples officielles) 6. Pastilles micro-États ✔ 7. Régions + difficulté ✔ (champ `n` des éléments, `regions`/`niveaux` dans config.js) 8. Répétition espacée
-9. Bilan + carte de maîtrise 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import
+5. Capitales dans les deux sens ✔ (choix des cas délicats validés le 21/10/2026 : plusieurs réponses seulement pour les capitales multiples officielles) 6. Pastilles micro-États ✔ 7. Régions + difficulté ✔ (champ `n` des éléments, `regions`/`niveaux` dans config.js) 8. Répétition espacée ✔ (`js/moteur/progression.js`, boîtes de Leitner par compétence « carte »/« capitale » ; l'ancien profil « Moi » est repris par le premier prénom créé)
+9. Bilan + carte de maîtrise ✔ (su = boîte ≥ 3, hésitant = 1-2, à revoir = 0) 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import ✔ (`js/moteur/profils.js` ; niveaux dans config.js ; code « GEO1- » + base64 d'un JSON compact)
 11. Défi du jour (série tirée de la date, résultat à partager en texte) 12. PWA hors ligne + mise en ligne
 
 ## Après chaque étape

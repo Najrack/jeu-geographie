@@ -15,6 +15,7 @@
   --juste: #0072b2;
   --faux: #d55e00;
   --cible: #e69f00;
+  --hesitant: #f0e442;
   --pastille: #4d4636;
   --panneau: #ffffff;
   --ombre: 0 2px 8px rgba(0, 0, 0, .15);
@@ -82,6 +83,9 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
 }
+/* Hors de la région choisie : estompé et impossible à toucher */
+.element.hors-zone, .territoire.hors-zone { fill: #e7e4dd; stroke: #dcd8cf; stroke-width: .3; pointer-events: none; }
+
 @media (hover: hover) {
   .element:hover { fill: var(--terre-survol); }
   .pastille:hover .point { fill: var(--primaire); }
@@ -92,7 +96,14 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 
 /* Marques posées par le jeu */
 .element[data-marque="juste"], .pastille[data-marque="juste"] .point { fill: var(--juste); fill-opacity: 1; stroke: #00395a; stroke-width: 1.5; }
-.element[data-marque="faux"],  .pastille[data-marque="faux"] .point  { fill: var(--faux); fill-opacity: 1; stroke: #6e2f00; stroke-width: 1.5; stroke-dasharray: 4 2; }
+.element[data-marque="faux"],  .pastille[data-marque="faux"] .point  { fill: url(#motif-faux); fill-opacity: 1; stroke: #6e2f00; stroke-width: 1.5; }
+.motif-faux-fond { fill: var(--faux); }
+.motif-faux-trait { stroke: #fff; stroke-width: 2; stroke-opacity: .55; }
+
+/* Carte de maîtrise (bilan) : su = bleu, hésitant = jaune, à revoir = vermillon hachuré */
+.element[data-marque="maitrise-su"], .pastille[data-marque="maitrise-su"] .point { fill: var(--juste); fill-opacity: 1; stroke: #00395a; }
+.element[data-marque="maitrise-hesitant"], .pastille[data-marque="maitrise-hesitant"] .point { fill: var(--hesitant); fill-opacity: 1; stroke: #6b6000; }
+.element[data-marque="maitrise-a-revoir"], .pastille[data-marque="maitrise-a-revoir"] .point { fill: url(#motif-faux); fill-opacity: 1; stroke: #6e2f00; }
 .element[data-marque="cible"], .pastille[data-marque="cible"] .point,
 .element[data-marque="choisi"], .pastille[data-marque="choisi"] .point { fill: var(--cible); fill-opacity: 1; stroke: #5a3d00; stroke-width: 2; }
 
@@ -126,6 +137,7 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   overflow-y: auto;
 }
 .panneau.panneau-grand { max-height: 64vh; max-height: 64dvh; }
+@media (min-width: 900px) { .panneau.panneau-grand { max-height: 50vh; max-height: 50dvh; } }
 .panneau p { margin: .25rem 0; }
 .progression { display: flex; justify-content: space-between; color: var(--texte-doux); font-size: .9rem; margin-bottom: .3rem; }
 .consigne { color: var(--texte-doux); }
@@ -174,6 +186,45 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 .choix button[aria-pressed="true"]::before { content: "✓ "; }
 .choix .nombre { font-weight: 400; font-size: .85em; opacity: .85; }
 .choix button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
+/* Accueil, joueurs, aide, sauvegarde */
+.entete-accueil { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: 1.1rem; }
+.grille-jeux { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.grille-jeux .bouton { margin-top: 0; padding: .5rem .6rem; line-height: 1.25; }
+.liens-accueil { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: .4rem; }
+.aide { padding-left: 1.2rem; margin: .4rem 0; }
+.aide li { margin: .3rem 0; }
+.liste-profils { display: flex; flex-direction: column; gap: .5rem; margin: .4rem 0 .8rem; }
+.ligne-profil { display: flex; gap: .5rem; align-items: center; }
+.ligne-profil .bouton { flex: 1; margin-top: 0; font-size: 1.1rem; }
+.bouton-supprimer {
+  min-width: 44px; min-height: 44px; border: none; border-radius: 10px;
+  background: #f1eee7; color: var(--texte-doux); font-size: 1.1rem;
+}
+.message-erreur { color: #a63c00; font-weight: 600; min-height: 1.2em; }
+.message-info { color: var(--juste); font-weight: 600; }
+.description-niveau { color: var(--texte-doux); font-size: .95rem; }
+.panneau textarea {
+  width: 100%; margin-top: .4rem; padding: .5rem;
+  font: inherit; font-size: .85rem; font-family: ui-monospace, Consolas, monospace;
+  border: 2px solid var(--frontiere); border-radius: var(--rayon); resize: vertical; word-break: break-all;
+}
+.zone-code .bouton { margin-top: .3rem; }
+
+/* Bilan */
+.legende { list-style: none; padding: 0; margin: .6rem 0; display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-size: .95rem; }
+.legende li { display: flex; align-items: center; gap: .35rem; }
+.echantillon { display: inline-block; width: 1.1em; height: 1.1em; border-radius: 3px; border: 1.5px solid var(--frontiere); }
+.echantillon-su { background: var(--juste); border-color: #00395a; }
+.echantillon-hesitant { background: var(--hesitant); border-color: #6b6000; }
+.echantillon-a-revoir { background: repeating-linear-gradient(45deg, var(--faux) 0 3px, #eeb48a 3px 5px); border-color: #6e2f00; }
+.echantillon-nouveau { background: var(--terre); }
+.tableau-bilan { width: 100%; border-collapse: collapse; margin-top: .4rem; font-size: .9rem; }
+.tableau-bilan th, .tableau-bilan td { padding: .35rem .3rem; text-align: left; border-bottom: 1px solid #e3dfd5; }
+.tableau-bilan thead th { color: var(--texte-doux); font-weight: 600; }
+.tableau-bilan td { white-space: nowrap; }
+.ligne-total th, .ligne-total td { font-weight: 700; border-bottom: none; }
+.barre-maitrise { display: block; width: 4.5rem; height: 6px; margin-top: 3px; border-radius: 3px; background: #e3dfd5; overflow: hidden; }
+.barre-maitrise span { display: block; height: 100%; background: var(--juste); }
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
 .rangee-boutons .bouton { flex: 1 1 12rem; }
 

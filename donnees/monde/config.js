@@ -31,11 +31,14 @@ GeoJeu.enregistrer("monde", {
     { id: "oceanie", nom: "Océanie", cadre: [[110, -48], [192, 12]], centre: 150 }
   ],
 
-  // Niveaux de difficulté (champ n des éléments : 1 = très connu, 3 = difficile)
+  // Niveaux proposés au joueur ; chacun règle tout d'un coup :
+  //   n      : éléments demandés jusqu'à cette difficulté (champ n des éléments : 1 = très connu, 3 = difficile)
+  //   nb     : nombre de questions par partie
+  //   strict : orthographe moins tolérante (une faute de moins acceptée)
   niveaux: [
-    { n: 1, nom: "Les plus connus" },
-    { n: 2, nom: "Connus et moyens" },
-    { n: 3, nom: "Tous les pays" }
+    { id: "facile", nom: "Facile", n: 1, nb: 10, description: "Les pays les plus connus, 10 questions." },
+    { id: "moyen", nom: "Moyen", n: 2, nb: 10, description: "Les pays connus et moyens, 10 questions." },
+    { id: "expert", nom: "Expert", n: 3, nb: 15, strict: true, description: "Tous les pays, 15 questions, orthographe plus exigeante." }
   ],
 
   // Formes de la carte à ne pas dessiner du tout

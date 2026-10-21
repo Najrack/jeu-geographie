@@ -24,11 +24,16 @@
   }
 
   class Partie {
-    // options : { jeu, carte, panneau, mode, elements, nbQuestions, quandFini }
+    // options : { jeu, carte, panneau, mode, elements, nbQuestions, progression, strict, quandFini }
+    // strict : orthographe moins tolérante dans les réponses tapées.
+    // Avec une progression, les questions sont tirées par répétition espacée et les réponses y sont notées.
     constructor(options) {
       Object.assign(this, options);
       if (this.mode.filtrer) this.elements = this.mode.filtrer(this.elements);
-      this.questions = melanger(this.elements).slice(0, this.nbQuestions || 10);
+      const nb = this.nbQuestions || 10;
+      this.questions = this.progression
+        ? this.progression.choisir(this.mode.competence, this.elements, nb)
+        : melanger(this.elements).slice(0, nb);
       this.index = -1;
       this.score = 0;
       this.resultats = [];
@@ -60,7 +65,9 @@
       if (!this.enAttente) return;
       this.enAttente = false;
       if (juste) this.score++;
-      this.resultats.push({ id: this.questions[this.index].id, juste: juste });
+      const id = this.questions[this.index].id;
+      this.resultats.push({ id: id, juste: juste });
+      if (this.progression) this.progression.noter(this.mode.competence, id, juste);
       this.afficher('<div class="retour ' + (juste ? "retour-juste" : "retour-faux") + '">' + html + "</div>" +
         '<button class="bouton bouton-principal" data-action="suivante">' +
         (this.index + 1 < this.questions.length ? "Question suivante" : "Voir le résultat") + "</button>");
@@ -104,8 +111,10 @@
   }
 
   // ---------- Mode « Où se trouve… ? » : on donne un nom, le joueur touche la carte ----------
+  // competence : ce que le mode fait travailler, pour la répétition espacée (« carte » ou « capitale »)
   GeoJeu.modes.localiser = {
     nom: function (jeu) { return "Où se trouve " + jeu.libelles.ceElement + " ?"; },
+    competence: "carte",
 
     poser: function (partie, el) {
       partie.carte.annulerZoomAuto();
@@ -160,6 +169,7 @@
   // ---------- Mode « Quel est ce pays ? » : un élément est coloré, le joueur tape son nom ----------
   GeoJeu.modes.nommer = {
     nom: function (jeu) { return "Quel est " + jeu.libelles.ceElement + " ?"; },
+    competence: "carte",
 
     poser: function (partie, el) {
       const lib = partie.jeu.libelles;
@@ -173,7 +183,7 @@
 
     repondre: function (partie, el, texte) {
       const carte = partie.carte;
-      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesNoms(partie.jeu), el.id);
+      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesNoms(partie.jeu), el.id, partie.strict);
       const juste = !!trouve && trouve.id === el.id;
       carte.marquer(el.id, "juste");
       let html;
@@ -221,6 +231,7 @@
   // ---------- Mode « Quelle est sa capitale ? » : le nom de l'élément est donné, on tape la capitale ----------
   GeoJeu.modes.capitale = {
     nom: function (jeu) { return "Quelle est sa " + jeu.libelles.capitale + " ?"; },
+    competence: "capitale",
     filtrer: avecCapitale,
 
     poser: function (partie, el) {
@@ -237,7 +248,7 @@
     repondre: function (partie, el, texte) {
       const jeu = partie.jeu;
       const carte = partie.carte;
-      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesCapitales(jeu), el.id);
+      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesCapitales(jeu), el.id, partie.strict);
       const juste = !!trouve && trouve.id === el.id;
       carte.marquer(el.id, "juste");
       let html;
@@ -264,6 +275,7 @@
   // ---------- Mode « À quel pays appartient cette capitale ? » : on touche l'élément sur la carte ----------
   GeoJeu.modes.capitaleVersElement = {
     nom: function (jeu) { return "À quel " + jeu.libelles.element + " est cette " + jeu.libelles.capitale + " ?"; },
+    competence: "capitale",
     filtrer: avecCapitale,
 
     poser: function (partie, el) {

@@ -30,7 +30,10 @@
         .attr("aria-label", "Carte : " + jeu.titre);
       this.svg.append("defs").html(
         '<pattern id="hachures" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
-        '<rect width="6" height="6" class="hachures-fond"/><line x1="0" y1="0" x2="0" y2="6" class="hachures-trait"/></pattern>');
+        '<rect width="6" height="6" class="hachures-fond"/><line x1="0" y1="0" x2="0" y2="6" class="hachures-trait"/></pattern>' +
+        // Erreurs et pays « à revoir » : hachurés, pour ne pas reposer que sur la couleur
+        '<pattern id="motif-faux" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        '<rect width="6" height="6" class="motif-faux-fond"/><line x1="0" y1="0" x2="0" y2="6" class="motif-faux-trait"/></pattern>');
       this.g = this.svg.append("g");
 
       this.zoom = d3.zoom()
@@ -105,9 +108,10 @@
       this.dessiner();
     }
 
-    // Montre une région du jeu de données ({ cadre, centre }), ou toute la carte si null
+    // Montre une région du jeu de données, ou toute la carte si null.
+    // zone : { id, cadre, centre, contient(element) } ; les éléments hors de la zone sont estompés et inactifs.
     definirZone(zone) {
-      if (zone === this.zone) return;
+      if ((zone && zone.id) === (this.zone && this.zone.id)) return;
       this.zone = zone;
       this.visee = null;
       this.forcerVueInitiale = true;
@@ -143,20 +147,27 @@
       g.append("path").datum({ type: "Sphere" }).attr("class", "ocean").attr("d", path);
       g.append("path").datum(d3.geoGraticule10()).attr("class", "graticule").attr("d", path);
 
+      const zone = this.zone && this.zone.cadre ? this.zone : null;
       const gTerr = g.append("g");
       for (const t of this.territoires) {
-        gTerr.append("path").attr("class", "territoire").attr("d", path(t.feature)).datum(t);
+        const c = d3.geoCentroid(t.feature);
+        const dedans = !zone || (c[0] >= zone.cadre[0][0] && c[0] <= zone.cadre[1][0] && c[1] >= zone.cadre[0][1] && c[1] <= zone.cadre[1][1]);
+        gTerr.append("path").attr("class", dedans ? "territoire" : "territoire hors-zone").attr("d", path(t.feature)).datum(t);
       }
 
+      const gHors = g.append("g");
       const gPays = g.append("g");
       const gPast = g.append("g");
       this.pastilles = [];
       for (const [id, f] of this.formes) {
         f.noeud = null; f.pastille = null;
         f.taille = f.feature ? Math.sqrt(path.area(f.feature)) : 0;
+        const horsZone = zone && !zone.contient(f.el);
         if (f.feature) {
-          f.noeud = gPays.append("path").attr("class", "element").attr("data-id", id).attr("d", path(f.feature)).node();
+          f.noeud = (horsZone ? gHors : gPays).append("path").attr("class", horsZone ? "element hors-zone" : "element")
+            .attr("data-id", horsZone ? null : id).attr("d", path(f.feature)).node();
         }
+        if (horsZone) continue;
         if ((!f.feature || f.taille < SEUIL_PASTILLE) && f.pt) {
           const xy = this.proj(f.pt);
           if (!xy) continue;
@@ -171,7 +182,14 @@
       }
 
       this.appliquerMarques();
-      this.zoom.translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]]);
+      this.zoom.translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]]).scaleExtent([1, ZOOM_MAX]);
+      if (zone) {
+        // En mode région : on ne peut ni dézoomer au-delà de la région, ni s'en éloigner
+        const t0 = this.vueInitiale();
+        const [[x0, y0], [x1, y1]] = this.cadrePx;
+        const mx = (x1 - x0) * 0.15, my = (y1 - y0) * 0.15;
+        this.zoom.scaleExtent([t0.k, ZOOM_MAX]).translateExtent([[x0 - mx, y0 - my], [x1 + mx, y1 + my]]);
+      }
       this.svg.interrupt();
       // Un zoom automatique en cours (ou fini) vise un endroit précis : on y va directement,
       // même s'il a été interrompu par le changement de taille (clavier du téléphone qui s'ouvre).
@@ -199,6 +217,7 @@
         for (let lat = s; lat <= n; lat += 5) pts.push(this.proj([o, lat]), this.proj([e, lat]));
         const xs = pts.filter(Boolean).map((p) => p[0]), ys = pts.filter(Boolean).map((p) => p[1]);
         const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        this.cadrePx = [[x0, y0], [x1, y1]];
         const k = Math.max(kRemplir, Math.min(ZOOM_CADRAGE * 2, 0.95 * Math.min(this.W / (x1 - x0), this.H / (y1 - y0))));
         return (this.tInitial = d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(k)
           .translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
@@ -275,6 +294,12 @@
 
     effacerMarques() {
       this.marques.clear();
+      this.appliquerMarques();
+    }
+
+    // Remplace toutes les marques d'un coup (Map id -> marque), par exemple pour la carte de maîtrise
+    definirMarques(marques) {
+      this.marques = new Map(marques);
       this.appliquerMarques();
     }
 

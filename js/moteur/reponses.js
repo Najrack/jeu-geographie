@@ -42,8 +42,8 @@
 
   // entrees : [{ id, noms: [nom affiché, variantes...] }]
   // Renvoie { id, nom, exact } pour l'entrée reconnue, ou null si la saisie ne ressemble à rien de connu.
-  // En cas d'égalité, l'entrée attendue (idAttendu) l'emporte.
-  function reconnaitre(saisie, entrees, idAttendu) {
+  // En cas d'égalité, l'entrée attendue (idAttendu) l'emporte. strict : une faute tolérée de moins.
+  function reconnaitre(saisie, entrees, idAttendu, strict) {
     const s = normaliser(saisie);
     if (!s) return null;
     let meilleur = null;
@@ -51,7 +51,7 @@
       for (const nom of e.noms) {
         const n = normaliser(nom);
         const d = distance(s, n);
-        if (d > tolerance(n.length)) continue;
+        if (d > Math.max(0, tolerance(n.length) - (strict ? 1 : 0))) continue;
         if (!meilleur || d < meilleur.d || (d === meilleur.d && e.id === idAttendu && meilleur.id !== idAttendu)) {
           meilleur = { id: e.id, nom: e.noms[0], d: d };
         }

@@ -12,6 +12,8 @@ clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », p
 
 ## Ce qui existe déjà
 
+- **Joueurs** : au premier lancement, un court texte d'aide puis « quel est votre prénom ? ». Chaque prénom a sa propre progression et ses réglages sur l'appareil, sans mot de passe. « Changer de joueur » permet d'en ajouter, d'en choisir un autre ou d'en supprimer (✕). L'aide reste accessible depuis l'accueil.
+- **Changer d'appareil** : « Créer mon code » produit un code de sauvegarde à copier et à s'envoyer (message, e-mail). Sur l'autre appareil, « Changer d'appareil » → coller le code → « Importer ». Si le prénom existe déjà, les deux progressions sont fusionnées (le résultat le plus récent de chaque pays est gardé).
 - La carte du monde avec zoom (molette, boutons + / −, deux doigts) et déplacement (glisser).
 - Deux types de carte : « Tailles réelles » (Equal Earth) et « Classique » (Mercator).
 - Des pastilles pour les tout petits pays (Vatican, Monaco, Luxembourg, Maldives…). Quand plusieurs sont collées, toucher l'une d'elles zoome sur la zone.
@@ -20,7 +22,10 @@ clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », p
 - « Quel est ce pays ? » : un pays est coloré en orange et la carte se cadre dessus ; on tape son nom. Les accents, majuscules, tirets et petites fautes sont tolérés (« kirgizistan », « etats unis », « usa » sont acceptés), mais un autre pays existant est refusé (« Irak » pour l'Iran) et montré sur la carte. « Je ne sais pas » donne la réponse.
 - « Quelle est sa capitale ? » : le pays est nommé et coloré, on tape sa capitale (mêmes tolérances). Pour les pays à plusieurs capitales (Bolivie, Afrique du Sud…), chacune est acceptée. Si on donne la capitale d'un autre pays, ce pays est montré.
 - « De quel pays est cette capitale ? » : une capitale est donnée, on touche son pays sur la carte (sélection puis validation).
-- Avant chaque partie : choix de la **région** (Monde, Europe, Afrique, Asie, Amériques, Océanie ; la carte se cadre aussitôt dessus) et de la **difficulté** (« Les plus connus », « Connus et moyens », « Tous les pays »). Le nombre de pays concernés est affiché. S'il y en a moins de 10 (Océanie), le jeu complète avec les plus grands pays du niveau suivant. Ces choix sont retenus sur l'appareil.
+- Avant chaque partie : choix de la **région** (Monde, Europe, Afrique, Asie, Amériques, Océanie ; la carte se cadre aussitôt dessus) et du **niveau** : **Facile** (les pays les plus connus, 10 questions), **Moyen** (connus et moyens, 10 questions), **Expert** (tous les pays, 15 questions, une faute d'orthographe de moins tolérée). Le nombre de pays possibles est affiché. S'il y en a trop peu (Océanie), le jeu complète avec les plus grands pays du niveau suivant. Ces choix sont retenus pour chaque joueur.
+- Quand on joue sur un continent, le reste du monde est estompé et ne peut pas être touché ; on ne peut pas non plus dézoomer ni s'éloigner au-delà du continent.
+- **Répétition espacée** : le jeu retient, pour chaque pays, s'il a été réussi ou raté (séparément pour la carte et pour les capitales). Les pays ratés reviennent beaucoup plus souvent, ceux qui sont sus de moins en moins. Cette mémoire reste dans le navigateur de l'appareil ; rien n'est envoyé.
+- **Mon bilan** : une carte de maîtrise où chaque pays est coloré selon ce que vous savez (bleu = su, jaune = hésitant, vermillon hachuré = à revoir, beige = jamais demandé), séparément pour la carte et pour les capitales. En touchant un pays, on voit combien de fois il a été réussi. Un tableau donne le nombre de pays sus, hésitants et à revoir par continent.
 - Un toucher qui suit de près un déplacement ou un zoom de la carte est ignoré, pour éviter les réponses involontaires.
 
 ## Mettre en ligne et partager
