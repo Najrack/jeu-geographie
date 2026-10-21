@@ -143,6 +143,22 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 }
 .bouton-principal { background: var(--primaire); color: var(--primaire-texte); }
 .bouton:disabled { opacity: .4; cursor: default; }
+.bouton-lien {
+  min-height: 44px; margin-top: .3rem; padding: 0 .2rem;
+  border: none; background: none; color: var(--primaire); text-decoration: underline; font-size: .95rem;
+}
+
+/* Saisie d'une réponse : 1.1rem minimum pour que l'iPhone ne zoome pas la page */
+.saisie { display: flex; gap: .5rem; margin-top: .4rem; }
+.saisie input {
+  flex: 1; min-width: 0; min-height: 48px; padding: 0 .8rem;
+  font: inherit; font-size: 1.15rem;
+  border: 2px solid var(--frontiere); border-radius: var(--rayon);
+}
+.saisie input:focus { outline: 3px solid var(--cible); outline-offset: 1px; border-color: var(--primaire); }
+.saisie .bouton { margin-top: 0; }
+.pastille-legende { display: inline-block; width: .8em; height: .8em; border-radius: 50%; vertical-align: -.05em; border: 2px solid #5a3d00; }
+.pastille-cible { background: var(--cible); }
 .aide-validation { font-size: .85rem; color: var(--texte-doux); }
 .bouton:focus-visible, .bouton-icone:focus-visible, .interrupteur button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }

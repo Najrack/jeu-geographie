@@ -24,11 +24,15 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 - Cas de capitales délicats (Israël, Palestine, Bolivie, Afrique du Sud…) : à faire valider à l'étape des capitales.
 
 ## Étapes de la phase 1
-1. Plan ✔ 2. Carte, zoom, projections ✔ 3. Mode « où est ce pays » ✔ (base) 4. Mode saisie du nom (tolérance accents/fautes)
-5. Capitales dans les deux sens 6. Pastilles micro-États ✔ 7. Régions + difficulté 8. Répétition espacée
+1. Plan ✔ 2. Carte, zoom, projections ✔ 3. Mode « où est ce pays » ✔ (sélection puis validation) 4. Mode saisie du nom ✔ (`js/moteur/reponses.js`)
+5. Capitales dans les deux sens ✔ (cas délicats en attente de validation) 6. Pastilles micro-États ✔ 7. Régions + difficulté 8. Répétition espacée
 9. Bilan + carte de maîtrise 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import
 11. Défi du jour (série tirée de la date, résultat à partager en texte) 12. PWA hors ligne + mise en ligne
 
 ## Après chaque étape
 Ouvrir la page, la tester (y compris cliquer sur un petit pays comme le Luxembourg, et à taille téléphone), dire ce qui a été vérifié et ce que le propriétaire doit tester lui-même.
 Tester avec `outils/serveur-local.ps1` (port 8123).
+
+## Mise en ligne
+GitHub Pages : https://najrack.github.io/jeu-geographie/ (dépôt Najrack/jeu-geographie). Pas de git sur le PC :
+le propriétaire envoie les fichiers à la main (Add file → Upload files, sans le dossier `.claude`). Lui rappeler de le faire après chaque étape.

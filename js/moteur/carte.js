@@ -6,6 +6,7 @@
   const RAYON_TOUCHER = 15;   // rayon de la zone qu'on peut toucher du doigt (px)
   const ECART_GROUPE = 22;    // deux pastilles plus proches que ça (px) : on zoome au lieu de choisir
   const ZOOM_MAX = 400;
+  const ZOOM_CADRAGE = 4;        // grossissement maximal pour montrer un élément en gardant des repères autour
   const DELAI_APRES_GESTE = 350; // ms pendant lesquelles un clic après un déplacement est ignoré
   const RAYON_TERRE_KM = 6371;
 
@@ -277,6 +278,25 @@
       const b = this.chemin.bounds(f.feature);
       const dx = b[1][0] - b[0][0], dy = b[1][1] - b[0][1];
       const k = Math.min(kMax, 0.5 / Math.max(dx / this.W, dy / this.H, 1e-6));
+      this.zoomVers(this.proj.invert([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2]), k);
+    }
+
+    // Montre un élément avec ses alentours pour qu'on puisse le reconnaître.
+    // On cadre sa plus grande partie (la métropole pour la France, pas la Guyane).
+    cadrer(id) {
+      const f = this.formes.get(id);
+      if (!f) return;
+      const kMin = this.tInitial ? this.tInitial.k : 1;
+      if (!f.feature) return this.zoomVers(f.pt, Math.max(kMin, ZOOM_CADRAGE));
+      let principal = null, aireMax = -1;
+      for (const poly of f.feature.geometry.coordinates) {
+        const p = { type: "Polygon", coordinates: poly };
+        const a = d3.geoArea(p);
+        if (a > aireMax) { aireMax = a; principal = p; }
+      }
+      const b = this.chemin.bounds(principal);
+      const dx = b[1][0] - b[0][0], dy = b[1][1] - b[0][1];
+      const k = Math.max(kMin, Math.min(ZOOM_CADRAGE, 0.3 / Math.max(dx / this.W, dy / this.H, 1e-6)));
       this.zoomVers(this.proj.invert([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2]), k);
     }
 

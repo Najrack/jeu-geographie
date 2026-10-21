@@ -17,6 +17,9 @@ clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », p
 - Des pastilles pour les tout petits pays (Vatican, Monaco, Luxembourg, Maldives…). Quand plusieurs sont collées, toucher l'une d'elles zoome sur la zone.
 - « Explorer la carte » : touchez un pays pour voir son nom et sa capitale.
 - « Où se trouve ce pays ? » : 10 pays au hasard à trouver sur la carte. Un premier toucher sélectionne le pays (en orange) ; on confirme avec « Valider » ou en le touchant une seconde fois. En cas d'erreur, le jeu affiche le bon pays, le nom du pays choisi et la distance.
+- « Quel est ce pays ? » : un pays est coloré en orange et la carte se cadre dessus ; on tape son nom. Les accents, majuscules, tirets et petites fautes sont tolérés (« kirgizistan », « etats unis », « usa » sont acceptés), mais un autre pays existant est refusé (« Irak » pour l'Iran) et montré sur la carte. « Je ne sais pas » donne la réponse.
+- « Quelle est sa capitale ? » : le pays est nommé et coloré, on tape sa capitale (mêmes tolérances). Pour les pays à plusieurs capitales (Bolivie, Afrique du Sud…), chacune est acceptée. Si on donne la capitale d'un autre pays, ce pays est montré.
+- « De quel pays est cette capitale ? » : une capitale est donnée, on touche son pays sur la carte (sélection puis validation).
 - Un toucher qui suit de près un déplacement ou un zoom de la carte est ignoré, pour éviter les réponses involontaires.
 
 ## Mettre en ligne et partager

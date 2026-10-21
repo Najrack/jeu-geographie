@@ -51,9 +51,14 @@
       "<p><strong>Bienvenue !</strong> Que voulez-vous faire ?</p>" +
       '<div class="rangee-boutons">' +
       '<button class="bouton bouton-principal" data-action="localiser">Où se trouve ce pays ?</button>' +
+      '<button class="bouton bouton-principal" data-action="nommer">Quel est ce pays ?</button>' +
+      '<button class="bouton bouton-principal" data-action="capitale">Quelle est sa capitale ?</button>' +
+      '<button class="bouton bouton-principal" data-action="capitaleVersElement">De quel pays est cette capitale ?</button>' +
       '<button class="bouton" data-action="explorer">Explorer la carte</button>' +
       "</div>";
-    panneau.querySelector('[data-action="localiser"]').addEventListener("click", () => jouer("localiser"));
+    for (const mode of ["localiser", "nommer", "capitale", "capitaleVersElement"]) {
+      panneau.querySelector('[data-action="' + mode + '"]').addEventListener("click", () => jouer(mode));
+    }
     panneau.querySelector('[data-action="explorer"]').addEventListener("click", explorer);
   }
 

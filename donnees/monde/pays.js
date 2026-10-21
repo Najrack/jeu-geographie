@@ -210,7 +210,7 @@ GeoJeu.enregistrer("monde", { elements: [
   { id: "670", nom: "Saint-Vincent-et-les-Grenadines", var: ["Saint-Vincent"], cont: "ameriques", cap: [["Kingstown"]], n: 3 },
   { id: "740", nom: "Suriname", var: ["Surinam"], cont: "ameriques", cap: [["Paramaribo"]], n: 3 },
   { id: "780", nom: "Trinité-et-Tobago", cont: "ameriques", cap: [["Port-d'Espagne", "Port of Spain"]], n: 3 },
-  { id: "840", nom: "États-Unis", var: ["USA", "Etats-Unis d'Amérique", "Amérique"], cont: "ameriques", cap: [["Washington"]], n: 1 },
+  { id: "840", nom: "États-Unis", var: ["USA", "Etats-Unis d'Amérique", "Amérique"], cont: "ameriques", cap: [["Washington", "Washington DC", "Washington D.C."]], n: 1 },
   { id: "858", nom: "Uruguay", cont: "ameriques", cap: [["Montevideo"]], n: 2 },
   { id: "862", nom: "Venezuela", var: ["Vénézuéla"], cont: "ameriques", cap: [["Caracas"]], n: 1 },
 

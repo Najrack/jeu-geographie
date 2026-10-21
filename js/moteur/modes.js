@@ -27,6 +27,7 @@
     // options : { jeu, carte, panneau, mode, elements, nbQuestions, quandFini }
     constructor(options) {
       Object.assign(this, options);
+      if (this.mode.filtrer) this.elements = this.mode.filtrer(this.elements);
       this.questions = melanger(this.elements).slice(0, this.nbQuestions || 10);
       this.index = -1;
       this.score = 0;
@@ -126,6 +127,174 @@
       }
       if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
       partie.resultat(clic.id === el.id, html);
+    }
+  };
+
+  // Réponse tapée au clavier. valider(texte) reçoit la saisie, ou null pour « Je ne sais pas ».
+  function saisirTexte(partie, htmlQuestion, etiquette, valider) {
+    partie.afficher(htmlQuestion +
+      '<form class="saisie" autocomplete="off">' +
+      '<input type="text" aria-label="' + esc(etiquette) + '" placeholder="' + esc(etiquette) + '"' +
+      ' autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">' +
+      '<button type="submit" class="bouton bouton-principal">Valider</button></form>' +
+      '<button type="button" class="bouton-lien" data-action="passer">Je ne sais pas</button>');
+    const form = partie.panneau.querySelector("form");
+    const champ = form.querySelector("input");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!champ.value.trim()) return champ.focus();
+      champ.blur(); // referme le clavier du téléphone pour laisser voir la carte
+      valider(champ.value);
+    });
+    partie.panneau.querySelector('[data-action="passer"]').addEventListener("click", () => valider(null));
+    champ.focus({ preventScroll: true });
+  }
+
+  // Liste des noms acceptés pour chaque élément du jeu (nom + variantes), calculée une fois
+  function entreesNoms(jeu) {
+    if (!jeu.entreesNoms) jeu.entreesNoms = jeu.elements.map((e) => ({ id: e.id, noms: [e.nom].concat(e.var || []) }));
+    return jeu.entreesNoms;
+  }
+
+  // ---------- Mode « Quel est ce pays ? » : un élément est coloré, le joueur tape son nom ----------
+  GeoJeu.modes.nommer = {
+    nom: function (jeu) { return "Quel est " + jeu.libelles.ceElement + " ?"; },
+
+    poser: function (partie, el) {
+      const lib = partie.jeu.libelles;
+      partie.carte.marquer(el.id, "cible");
+      partie.carte.cadrer(el.id);
+      saisirTexte(partie,
+        '<p class="consigne">Quel est ' + esc(lib.ceElement) + ' <span class="pastille-legende pastille-cible"></span> en orange ?</p>',
+        "Nom du " + lib.element,
+        (texte) => this.repondre(partie, el, texte));
+    },
+
+    repondre: function (partie, el, texte) {
+      const carte = partie.carte;
+      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesNoms(partie.jeu), el.id);
+      const juste = !!trouve && trouve.id === el.id;
+      carte.marquer(el.id, "juste");
+      let html;
+      if (juste) {
+        html = '<p class="verdict">✓ Bravo !</p><p>C\'est bien <strong>' + esc(el.nom) + "</strong>." +
+          (trouve.exact ? "" : " (On l'écrit ainsi.)") + "</p>";
+      } else {
+        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>" +
+          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu).</p>";
+        if (trouve) {
+          carte.marquer(trouve.id, "faux");
+          html += "<p><strong>" + esc(trouve.nom) + "</strong>, votre réponse, est en orange hachuré.</p>";
+        } else if (texte != null) {
+          html += "<p>Votre réponse « " + esc(texte.trim()) + " » ne correspond à aucun " + esc(partie.jeu.libelles.element) + ".</p>";
+        }
+      }
+      if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
+      partie.resultat(juste, html);
+    }
+  };
+
+  // Une entrée par capitale (une capitale = son nom affiché + ses variantes), rattachée à son élément
+  function entreesCapitales(jeu) {
+    if (!jeu.entreesCapitales) {
+      jeu.entreesCapitales = [];
+      for (const e of jeu.elements) for (const c of e.cap || []) jeu.entreesCapitales.push({ id: e.id, noms: c });
+    }
+    return jeu.entreesCapitales;
+  }
+
+  // « Pays · capitale : X » ou « Pays · capitales : X, Y », avec la note éventuelle
+  function ficheCapitales(jeu, el) {
+    const lib = jeu.libelles;
+    const caps = el.cap.map((c) => c[0]);
+    let html = "<p><strong>" + esc(el.nom) + "</strong> · " + esc(caps.length > 1 ? lib.capitales : lib.capitale) +
+      " : <strong>" + esc(caps.join(", ")) + "</strong></p>";
+    if (el.capNote) html += '<p class="statut">' + esc(el.capNote) + "</p>";
+    return html;
+  }
+
+  function avecCapitale(elements) {
+    return elements.filter((e) => e.cap && e.cap.length);
+  }
+
+  // ---------- Mode « Quelle est sa capitale ? » : le nom de l'élément est donné, on tape la capitale ----------
+  GeoJeu.modes.capitale = {
+    nom: function (jeu) { return "Quelle est sa " + jeu.libelles.capitale + " ?"; },
+    filtrer: avecCapitale,
+
+    poser: function (partie, el) {
+      const lib = partie.jeu.libelles;
+      partie.carte.marquer(el.id, "cible");
+      partie.carte.cadrer(el.id);
+      saisirTexte(partie,
+        '<p class="consigne">Quelle est la ' + esc(lib.capitale) + " de ce " + esc(lib.element) + " ?</p>" +
+        '<p class="question-nom">' + esc(el.nom) + "</p>",
+        "Nom de la " + lib.capitale,
+        (texte) => this.repondre(partie, el, texte));
+    },
+
+    repondre: function (partie, el, texte) {
+      const jeu = partie.jeu;
+      const carte = partie.carte;
+      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitre(texte, entreesCapitales(jeu), el.id);
+      const juste = !!trouve && trouve.id === el.id;
+      carte.marquer(el.id, "juste");
+      let html;
+      if (juste) {
+        html = '<p class="verdict">✓ Bravo !</p>' +
+          (trouve.exact ? "" : "<p>On écrit <strong>" + esc(trouve.nom) + "</strong>.</p>");
+      } else {
+        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>";
+        if (trouve) {
+          const autre = jeu.elements.find((e) => e.id === trouve.id);
+          carte.marquer(autre.id, "faux");
+          html += "<p>" + esc(trouve.nom) + " est la " + esc(jeu.libelles.capitale) + " d'un autre " + esc(jeu.libelles.element) +
+            " : <strong>" + esc(autre.nom) + "</strong> (en orange hachuré).</p>";
+        } else if (texte != null) {
+          html += "<p>« " + esc(texte.trim()) + " » ne correspond à aucune " + esc(jeu.libelles.capitale) + " connue.</p>";
+        }
+      }
+      html += ficheCapitales(jeu, el);
+      if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
+      partie.resultat(juste, html);
+    }
+  };
+
+  // ---------- Mode « À quel pays appartient cette capitale ? » : on touche l'élément sur la carte ----------
+  GeoJeu.modes.capitaleVersElement = {
+    nom: function (jeu) { return "À quel " + jeu.libelles.element + " est cette " + jeu.libelles.capitale + " ?"; },
+    filtrer: avecCapitale,
+
+    poser: function (partie, el) {
+      const lib = partie.jeu.libelles;
+      // Pour les éléments à plusieurs capitales, on en demande une au hasard
+      const capitale = el.cap[Math.floor(Math.random() * el.cap.length)][0];
+      choisirSurCarte(partie,
+        '<p class="consigne">De quel ' + esc(lib.element) + " est-ce la " + esc(lib.capitale) + " ?</p>" +
+        '<p class="question-nom">' + esc(capitale) + "</p>",
+        (clic) => this.repondre(partie, el, capitale, clic));
+    },
+
+    repondre: function (partie, el, capitale, clic) {
+      const jeu = partie.jeu;
+      const carte = partie.carte;
+      const juste = clic.id === el.id;
+      carte.marquer(el.id, "juste");
+      let html;
+      if (juste) {
+        html = '<p class="verdict">✓ Bravo !</p>';
+      } else {
+        carte.marquer(clic.id, "faux");
+        html = '<p class="verdict">✗ Raté</p>' +
+          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu), " +
+          texteDistance(carte.distanceKm(el.id, clic.lonlat)) + " de votre choix.</p>" +
+          '<p class="statut">Vous avez choisi : ' + esc(clic.element.nom) + " (" + esc(jeu.libelles.capitale) + " : " +
+          esc(clic.element.cap.map((c) => c[0]).join(", ")) + ").</p>";
+        if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
+      }
+      html += ficheCapitales(jeu, el);
+      if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
+      partie.resultat(juste, html);
     }
   };
 
