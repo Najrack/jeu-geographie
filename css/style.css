@@ -1,0 +1,153 @@
+/* Couleurs choisies dans la palette Okabe-Ito, lisible par les personnes daltoniennes.
+   Juste = bleu, faux = vermillon hachuré (la différence ne repose pas que sur la couleur). */
+:root {
+  --fond: #f6f4ef;
+  --texte: #1d1d1b;
+  --texte-doux: #55524a;
+  --primaire: #1f4e79;
+  --primaire-texte: #ffffff;
+  --ocean: #d4e4ee;
+  --graticule: #bcd2df;
+  --terre: #ebe4d1;
+  --terre-survol: #d6c9a6;
+  --frontiere: #8c826c;
+  --territoire: #d3d0c9;
+  --juste: #0072b2;
+  --faux: #d55e00;
+  --cible: #e69f00;
+  --pastille: #4d4636;
+  --panneau: #ffffff;
+  --ombre: 0 2px 8px rgba(0, 0, 0, .15);
+  --rayon: 12px;
+  font-size: 18px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--fond);
+  color: var(--texte);
+  line-height: 1.4;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ---------- Barre du haut ---------- */
+.barre {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .6rem;
+  padding-top: max(.4rem, env(safe-area-inset-top));
+  background: var(--primaire);
+  color: var(--primaire-texte);
+}
+.barre h1 { flex: 1; margin: 0; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+button { font: inherit; cursor: pointer; }
+.bouton-icone {
+  min-width: 44px; min-height: 44px;
+  border: none; border-radius: 10px;
+  background: rgba(255, 255, 255, .15);
+  color: inherit;
+  font-size: 1.4rem; line-height: 1;
+}
+.interrupteur { display: flex; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .6); }
+.interrupteur button {
+  min-height: 40px; padding: 0 .7rem;
+  border: none; background: transparent; color: inherit; font-size: .85rem;
+}
+.interrupteur button[aria-pressed="true"] { background: #fff; color: var(--primaire); font-weight: 700; }
+
+/* ---------- Carte ---------- */
+#zone-carte { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+svg.carte { position: absolute; inset: 0; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+.ocean { fill: var(--ocean); }
+.graticule { fill: none; stroke: var(--graticule); stroke-width: .5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.territoire { fill: url(#hachures); stroke: var(--frontiere); stroke-width: .4; vector-effect: non-scaling-stroke; }
+.hachures-fond { fill: var(--territoire); }
+.hachures-trait { stroke: #b8b4ab; stroke-width: 2; }
+
+.element {
+  fill: var(--terre);
+  stroke: var(--frontiere);
+  stroke-width: .6;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .element:hover { fill: var(--terre-survol); }
+  .pastille:hover .point { fill: var(--primaire); }
+}
+
+.pastille .toucher { fill: transparent; }
+.pastille .point { fill: var(--pastille); fill-opacity: .55; stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+/* Marques posées par le jeu */
+.element[data-marque="juste"], .pastille[data-marque="juste"] .point { fill: var(--juste); fill-opacity: 1; stroke: #00395a; stroke-width: 1.5; }
+.element[data-marque="faux"],  .pastille[data-marque="faux"] .point  { fill: var(--faux); fill-opacity: 1; stroke: #6e2f00; stroke-width: 1.5; stroke-dasharray: 4 2; }
+.element[data-marque="cible"], .pastille[data-marque="cible"] .point,
+.element[data-marque="choisi"], .pastille[data-marque="choisi"] .point { fill: var(--cible); fill-opacity: 1; stroke: #5a3d00; stroke-width: 2; }
+
+.boutons-zoom {
+  position: absolute; right: .6rem; top: .6rem; z-index: 2;
+  display: flex; flex-direction: column; gap: .4rem;
+}
+.boutons-zoom .bouton-icone { background: #fff; color: var(--primaire); box-shadow: var(--ombre); }
+
+.bulle {
+  position: absolute; left: 50%; top: .6rem; transform: translateX(-50%); z-index: 2;
+  max-width: calc(100% - 5rem);
+  padding: .4rem .9rem; border-radius: 999px;
+  background: rgba(29, 29, 27, .85); color: #fff; font-size: .9rem; text-align: center;
+  pointer-events: none;
+}
+
+.message-chargement {
+  position: absolute; left: 1rem; right: 1rem; top: 30%; z-index: 1;
+  max-width: 32rem; margin: 0 auto; padding: 1rem 1.2rem;
+  background: #fff; border-radius: var(--rayon); box-shadow: var(--ombre);
+}
+
+/* ---------- Panneau du bas ---------- */
+.panneau {
+  background: var(--panneau);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .1);
+  padding: .8rem 1rem;
+  padding-bottom: max(.8rem, env(safe-area-inset-bottom));
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.panneau p { margin: .25rem 0; }
+.progression { display: flex; justify-content: space-between; color: var(--texte-doux); font-size: .9rem; margin-bottom: .3rem; }
+.consigne { color: var(--texte-doux); }
+.question-nom { font-size: 1.6rem; font-weight: 700; color: var(--primaire); }
+.verdict { font-size: 1.3rem; font-weight: 700; }
+.retour-juste .verdict { color: var(--juste); }
+.retour-faux .verdict { color: var(--faux); }
+.statut { font-size: .9rem; color: var(--texte-doux); }
+.fiche-nom { font-size: 1.4rem; font-weight: 700; }
+
+.bouton {
+  display: inline-block;
+  min-height: 48px; padding: .6rem 1.2rem; margin-top: .5rem;
+  border-radius: var(--rayon); border: 2px solid var(--primaire);
+  background: #fff; color: var(--primaire); font-weight: 600;
+}
+.bouton-principal { background: var(--primaire); color: var(--primaire-texte); }
+.bouton:focus-visible, .bouton-icone:focus-visible, .interrupteur button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
+.rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
+.rangee-boutons .bouton { flex: 1 1 12rem; }
+
+@media (max-width: 420px) {
+  :root { font-size: 17px; }
+  .barre h1 { font-size: 1rem; }
+  .question-nom { font-size: 1.4rem; }
+}

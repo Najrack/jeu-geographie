@@ -1,0 +1,299 @@
+// Dessin de la carte d'un jeu de données : formes, zoom, déplacement, pastilles des petits éléments,
+// marquage des réponses. Ne connaît aucun pays en particulier : tout vient du jeu de données.
+(function () {
+  const SEUIL_PASTILLE = 10;  // taille à l'écran (px) sous laquelle un élément reçoit une pastille
+  const RAYON_PASTILLE = 5;   // rayon visible (px)
+  const RAYON_TOUCHER = 15;   // rayon de la zone qu'on peut toucher du doigt (px)
+  const ECART_GROUPE = 22;    // deux pastilles plus proches que ça (px) : on zoome au lieu de choisir
+  const ZOOM_MAX = 400;
+  const RAYON_TERRE_KM = 6371;
+
+  class Carte {
+    constructor(conteneur, jeu) {
+      this.conteneur = conteneur;
+      this.jeu = jeu;
+      this.projectionId = jeu.projections[0].id;
+      this.marques = new Map();          // id d'élément -> nom de marque (juste, faux, cible, choisi…)
+      this.t = d3.zoomIdentity;
+      this.pastilles = [];
+      this.auClic = function () {};      // remplacé par le jeu : function (clic) {...}
+      this.auZoomAuto = function () {};  // prévenu quand un clic sur un groupe de pastilles zoome
+
+      this.preparerFormes();
+
+      this.svg = d3.select(conteneur).append("svg")
+        .attr("class", "carte")
+        .attr("role", "img")
+        .attr("aria-label", "Carte : " + jeu.titre);
+      this.svg.append("defs").html(
+        '<pattern id="hachures" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        '<rect width="6" height="6" class="hachures-fond"/><line x1="0" y1="0" x2="0" y2="6" class="hachures-trait"/></pattern>');
+      this.g = this.svg.append("g");
+
+      this.zoom = d3.zoom()
+        .scaleExtent([1, ZOOM_MAX])
+        .clickDistance(6)
+        .on("zoom", (e) => this.surZoom(e.transform));
+      this.svg.call(this.zoom).on("dblclick.zoom", null);
+      this.svg.on("click", (e) => this.surClic(e));
+
+      this.dessiner();
+      let attente = null;
+      new ResizeObserver(() => {
+        clearTimeout(attente);
+        attente = setTimeout(() => {
+          if (this.conteneur.clientWidth !== this.W || this.conteneur.clientHeight !== this.H) this.dessiner();
+        }, 60);
+      }).observe(conteneur);
+    }
+
+    // Regroupe les formes du fond de carte par élément du jeu (avec les rattachements du jeu de données).
+    preparerFormes() {
+      const jeu = this.jeu;
+      const topo = jeu.topo;
+      const rattacher = jeu.rattacher || {};
+      const ignorer = jeu.ignorer || [];
+      const parElement = new Map(jeu.elements.map((el) => [el.id, []]));
+      const autres = [];
+
+      for (const g of topo.objects[jeu.objetCarte].geometries) {
+        const nom = g.properties && g.properties.name;
+        const cleForme = g.id || nom;
+        if (ignorer.includes(cleForme)) continue;
+        const cle = rattacher[cleForme] || cleForme;
+        if (parElement.has(cle)) parElement.get(cle).push(g);
+        else autres.push({ cle: cleForme, g: g });
+      }
+
+      this.formes = new Map();
+      for (const el of jeu.elements) {
+        const geoms = parElement.get(el.id);
+        const feature = geoms.length
+          ? { type: "Feature", id: el.id, geometry: topojson.merge(topo, geoms) }
+          : null;
+        this.formes.set(el.id, {
+          el: el,
+          feature: feature,
+          pt: el.pt || (feature ? d3.geoCentroid(feature) : null)
+        });
+      }
+
+      const noms = jeu.territoires || {};
+      this.territoires = autres.map((o) => ({
+        nom: noms[o.cle] || "Territoire non jouable",
+        feature: topojson.feature(topo, o.g)
+      }));
+    }
+
+    changerProjection(id) {
+      this.projectionId = id;
+      this.dessiner();
+    }
+
+    dessiner() {
+      const W = this.conteneur.clientWidth, H = this.conteneur.clientHeight;
+      if (!W || !H) return;
+      // Si la carte était zoomée (et la projection inchangée), on garde le même endroit au centre après redessin.
+      const ti = this.tInitial;
+      const surVueInitiale = ti && Math.abs(this.t.k - ti.k) < 0.01 && Math.abs(this.t.x - ti.x) < 2 && Math.abs(this.t.y - ti.y) < 2;
+      const garder = this.proj && this.t.k > 1 && !surVueInitiale && this.projDessinee === this.projectionId
+        ? { centre: this.proj.invert(this.t.invert([this.W / 2, this.H / 2])), k: this.t.k } : null;
+      this.projDessinee = this.projectionId;
+      this.W = W; this.H = H;
+      this.svg.attr("viewBox", "0 0 " + W + " " + H).attr("width", W).attr("height", H);
+
+      const m = 6;
+      if (this.projectionId === "mercator") {
+        this.proj = d3.geoMercator().fitExtent([[m, m], [W - m, H - m]],
+          { type: "MultiPoint", coordinates: [[-179.9, -57], [179.9, 83]] });
+      } else {
+        this.proj = d3.geoEqualEarth().fitExtent([[m, m], [W - m, H - m]], { type: "Sphere" });
+      }
+      const path = d3.geoPath(this.proj);
+      this.chemin = path;
+
+      const g = this.g;
+      g.selectAll("*").remove();
+      g.append("path").datum({ type: "Sphere" }).attr("class", "ocean").attr("d", path);
+      g.append("path").datum(d3.geoGraticule10()).attr("class", "graticule").attr("d", path);
+
+      const gTerr = g.append("g");
+      for (const t of this.territoires) {
+        gTerr.append("path").attr("class", "territoire").attr("d", path(t.feature)).datum(t);
+      }
+
+      const gPays = g.append("g");
+      const gPast = g.append("g");
+      this.pastilles = [];
+      for (const [id, f] of this.formes) {
+        f.noeud = null; f.pastille = null;
+        f.taille = f.feature ? Math.sqrt(path.area(f.feature)) : 0;
+        if (f.feature) {
+          f.noeud = gPays.append("path").attr("class", "element").attr("data-id", id).attr("d", path(f.feature)).node();
+        }
+        if ((!f.feature || f.taille < SEUIL_PASTILLE) && f.pt) {
+          const xy = this.proj(f.pt);
+          if (!xy) continue;
+          const p = gPast.append("g").attr("class", "pastille").attr("data-id", id)
+            .attr("transform", "translate(" + xy[0] + "," + xy[1] + ")");
+          p.append("circle").attr("class", "toucher");
+          p.append("circle").attr("class", "point");
+          f.pastille = p.node();
+          f.xy = xy;
+          this.pastilles.push(f);
+        }
+      }
+
+      this.appliquerMarques();
+      this.zoom.translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]]);
+      this.svg.interrupt();
+      this.svg.call(this.zoom.transform, garder ? this.transformVers(garder.centre, garder.k) : this.vueInitiale());
+    }
+
+    // Vue de départ : toute la carte, sauf sur un écran en hauteur (téléphone) où la carte
+    // remplit la hauteur et se parcourt en glissant, sinon elle serait minuscule.
+    vueInitiale() {
+      const b = this.chemin.bounds({ type: "Sphere" });
+      const hCarte = b[1][1] - b[0][1];
+      if (!isFinite(hCarte) || hCarte >= this.H * 0.7) return (this.tInitial = d3.zoomIdentity);
+      const k = Math.min(5, this.H / hCarte);
+      const x = this.proj([this.jeu.longitudeTelephone || 15, 0])[0];
+      return (this.tInitial = d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(k).translate(-x, -(b[0][1] + b[1][1]) / 2));
+    }
+
+    // Transformation qui place un point (lon, lat) au centre avec le grossissement k
+    transformVers(lonlat, k) {
+      const xy = this.proj(lonlat);
+      k = Math.min(ZOOM_MAX, Math.max(1, k));
+      return d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(k).translate(-xy[0], -xy[1]);
+    }
+
+    surZoom(t) {
+      this.t = t;
+      this.g.attr("transform", t);
+      const k = t.k;
+      for (const f of this.pastilles) {
+        const visible = !f.feature || f.taille * k < SEUIL_PASTILLE || this.marques.has(f.el.id) && f.taille * k < SEUIL_PASTILLE * 2;
+        f.visible = visible;
+        f.pastille.style.display = visible ? "" : "none";
+        if (visible) {
+          f.pastille.firstChild.setAttribute("r", RAYON_TOUCHER / k);
+          f.pastille.lastChild.setAttribute("r", RAYON_PASTILLE / k);
+        }
+      }
+    }
+
+    // ---------- Clics ----------
+
+    surClic(e) {
+      if (e.defaultPrevented) return; // fin d'un glisser : pas un clic
+      const ecran = d3.pointer(e, this.svg.node());
+      let lonlat = this.proj.invert(this.t.invert(ecran));
+      if (!lonlat || !isFinite(lonlat[0]) || Math.abs(lonlat[0]) > 180 || Math.abs(lonlat[1]) > 90) lonlat = null;
+
+      const cible = e.target.closest("[data-id]");
+      if (cible) {
+        const id = cible.getAttribute("data-id");
+        const f = this.formes.get(id);
+        if (cible.classList.contains("pastille")) {
+          if (this.groupeDense(f)) {
+            this.zoomVers(f.pt, Math.max(this.t.k * 4, 6));
+            this.auZoomAuto();
+            return;
+          }
+          lonlat = f.pt;
+        }
+        this.auClic({ id: id, element: f.el, lonlat: lonlat });
+        return;
+      }
+      const terr = e.target.classList.contains("territoire") ? d3.select(e.target).datum() : null;
+      this.auClic({ id: null, territoire: terr ? terr.nom : null, lonlat: lonlat });
+    }
+
+    // Vrai si d'autres pastilles visibles sont trop proches pour être distinguées au doigt.
+    groupeDense(f) {
+      if (this.t.k >= ZOOM_MAX / 2) return false;
+      const k = this.t.k;
+      return this.pastilles.some((o) => o !== f && o.visible &&
+        Math.hypot((o.xy[0] - f.xy[0]) * k, (o.xy[1] - f.xy[1]) * k) < ECART_GROUPE);
+    }
+
+    // ---------- Marques (couleurs des réponses) ----------
+
+    marquer(id, marque) {
+      if (marque) this.marques.set(id, marque); else this.marques.delete(id);
+      this.appliquerMarques();
+    }
+
+    effacerMarques() {
+      this.marques.clear();
+      this.appliquerMarques();
+    }
+
+    appliquerMarques() {
+      for (const [id, f] of this.formes) {
+        const m = this.marques.get(id) || null;
+        for (const n of [f.noeud, f.pastille]) {
+          if (!n) continue;
+          if (m) n.setAttribute("data-marque", m); else n.removeAttribute("data-marque");
+        }
+        // Un élément marqué passe au premier plan pour que son contour soit visible
+        if (m && f.noeud) f.noeud.parentNode.appendChild(f.noeud);
+      }
+      if (this.t) this.surZoom(this.t);
+    }
+
+    // ---------- Zoom ----------
+
+    zoomer(facteur) {
+      this.svg.transition().duration(300).call(this.zoom.scaleBy, facteur);
+    }
+
+    reinitialiserZoom() {
+      this.svg.transition().duration(500).call(this.zoom.transform, this.vueInitiale());
+    }
+
+    zoomVers(lonlat, k) {
+      if (!this.proj(lonlat)) return;
+      this.svg.transition().duration(700).call(this.zoom.transform, this.transformVers(lonlat, k));
+    }
+
+    // Cadre un élément ; kMax limite le grossissement pour garder des repères autour.
+    zoomSur(id, kMax) {
+      const f = this.formes.get(id);
+      if (!f) return;
+      kMax = kMax || 30;
+      if (!f.feature) return this.zoomVers(f.pt, kMax);
+      const b = this.chemin.bounds(f.feature);
+      const dx = b[1][0] - b[0][0], dy = b[1][1] - b[0][1];
+      const k = Math.min(kMax, 0.5 / Math.max(dx / this.W, dy / this.H, 1e-6));
+      this.zoomVers(this.proj.invert([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2]), k);
+    }
+
+    // Vrai si l'élément est trop petit pour être vu sans zoom
+    estPetit(id) {
+      const f = this.formes.get(id);
+      return !f || !f.feature || f.taille < SEUIL_PASTILLE * 2;
+    }
+
+    // ---------- Distances ----------
+
+    // Distance approximative (km) entre un point et le bord le plus proche de l'élément (0 si dedans).
+    distanceKm(id, lonlat) {
+      const f = this.formes.get(id);
+      if (!f || !lonlat) return null;
+      if (!f.feature) return d3.geoDistance(lonlat, f.pt) * RAYON_TERRE_KM;
+      if (d3.geoContains(f.feature, lonlat)) return 0;
+      let min = Infinity;
+      for (const poly of f.feature.geometry.coordinates)
+        for (const anneau of poly)
+          for (const c of anneau) {
+            const d = d3.geoDistance(lonlat, c);
+            if (d < min) min = d;
+          }
+      return min * RAYON_TERRE_KM;
+    }
+  }
+
+  GeoJeu.Carte = Carte;
+})();
