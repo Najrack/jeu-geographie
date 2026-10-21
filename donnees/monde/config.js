@@ -13,10 +13,16 @@ GeoJeu.enregistrer("monde", {
   // Nom de la collection de formes dans le fond de carte
   objetCarte: "countries",
 
-  // Projections proposées (la première est celle par défaut)
+  // Projections proposées (la première est celle par défaut).
+  //   creer(lon0)   : fabrique la projection, centrée sur la longitude lon0
+  //   etendue(lon0) : ce qui doit tenir à l'écran (sans etendue : toutes les formes de la carte)
   projections: [
-    { id: "equalEarth", nom: "Tailles réelles", aide: "Projection Equal Earth : les surfaces sont respectées" },
-    { id: "mercator", nom: "Classique", aide: "Projection Mercator : la carte habituelle, mais les pays du nord paraissent plus grands" }
+    { id: "equalEarth", nom: "Tailles réelles", aide: "Projection Equal Earth : les surfaces sont respectées",
+      creer: function (lon0) { return d3.geoEqualEarth().rotate([-lon0, 0]); },
+      etendue: function () { return { type: "Sphere" }; } },
+    { id: "mercator", nom: "Classique", aide: "Projection Mercator : la carte habituelle, mais les pays du nord paraissent plus grands",
+      creer: function (lon0) { return d3.geoMercator().rotate([-lon0, 0]); },
+      etendue: function (lon0) { return { type: "MultiPoint", coordinates: [[lon0 - 179.9, -57], [lon0 + 179.9, 83]] }; } }
   ],
 
   // Régions proposées au joueur. "tout" = toute la carte.

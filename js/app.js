@@ -3,30 +3,61 @@
 (function () {
   const esc = GeoJeu.outils.esc;
   const profils = GeoJeu.profils;
-  const jeu = GeoJeu.jeux.monde;
   // Adresse en ligne du jeu, pour fabriquer les liens de sauvegarde quand la page est ouverte depuis un fichier
   const ADRESSE_PUBLIQUE = "https://najrack.github.io/jeu-geographie/";
-  const lib = jeu.libelles;
-  const pluriel = lib.lesElements.replace(/^les /, ""); // « pays »
   const majuscule = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   const panneau = document.getElementById("panneau");
   const bulle = document.getElementById("bulle");
-  const carte = new GeoJeu.Carte(document.getElementById("zone-carte"), jeu);
-  window.carte = carte; // pratique pour tester depuis la console du navigateur
-  document.getElementById("message-chargement").remove();
+  const zoneCarte = document.getElementById("zone-carte");
+  const choixProjection = document.getElementById("choix-projection");
+
+  // ---------- Jeu de données en cours (le monde, la France…) ----------
+  let jeu = null;     // réglages et éléments du jeu ouvert
+  let lib = null;     // ses mots (« pays », « capitale »…)
+  let pluriel = "";   // « pays », « départements »
+  let carte = null;
+
+  function ouvrirJeu(id) {
+    return GeoJeu.charger(id).then((donnees) => {
+      if (carte) carte.detruire();
+      jeu = donnees;
+      lib = jeu.libelles;
+      pluriel = lib.lesElements.replace(/^les /, "");
+      carte = new GeoJeu.Carte(zoneCarte, jeu);
+      window.carte = carte; // pratique pour tester depuis la console du navigateur
+      carte.auZoomAuto = () => montrerBulle("Plusieurs petits " + pluriel + " ici : zoom avant. Touchez à nouveau.");
+      construireChoixProjection();
+      if (joueur) {
+        progression = new GeoJeu.Progression(joueur, jeu.id);
+        reglages = lireReglages();
+        profils.enregistrerReglages(joueur, "_general", { jeu: jeu.id });
+      }
+    });
+  }
+
+  // Dernier jeu ouvert par ce joueur (le monde par défaut)
+  function jeuDuJoueur(nom) {
+    const general = nom && profils.reglages(nom, "_general");
+    const id = general && general.jeu;
+    return GeoJeu.catalogue.some((j) => j.id === id) ? id : GeoJeu.catalogue[0].id;
+  }
 
   // ---------- Barre du haut ----------
-  const choixProjection = document.getElementById("choix-projection");
-  for (const p of jeu.projections) {
-    const b = document.createElement("button");
-    b.textContent = p.nom;
-    b.title = p.aide;
-    b.setAttribute("aria-pressed", String(p.id === carte.projectionId));
-    b.addEventListener("click", () => {
-      carte.changerProjection(p.id);
-      for (const autre of choixProjection.children) autre.setAttribute("aria-pressed", String(autre === b));
-    });
-    choixProjection.appendChild(b);
+  // Choix de projection, seulement si le jeu en propose plusieurs
+  function construireChoixProjection() {
+    choixProjection.innerHTML = "";
+    choixProjection.hidden = jeu.projections.length < 2;
+    for (const p of jeu.projections) {
+      const b = document.createElement("button");
+      b.textContent = p.nom;
+      b.title = p.aide;
+      b.setAttribute("aria-pressed", String(p.id === carte.projectionId));
+      b.addEventListener("click", () => {
+        carte.changerProjection(p.id);
+        for (const autre of choixProjection.children) autre.setAttribute("aria-pressed", String(autre === b));
+      });
+      choixProjection.appendChild(b);
+    }
   }
 
   document.querySelector(".boutons-zoom").addEventListener("click", (e) => {
@@ -47,7 +78,6 @@
     clearTimeout(minuterieBulle);
     minuterieBulle = setTimeout(() => { bulle.hidden = true; }, 2500);
   }
-  carte.auZoomAuto = () => montrerBulle("Plusieurs petits pays ici : zoom avant. Touchez à nouveau.");
 
   // Affiche un écran dans le panneau du bas ; grand = le panneau peut prendre plus de hauteur
   function ecran(html, grand) {
@@ -112,32 +142,40 @@
     carteAuRepos();
     ecran('<p class="titre-ecran">Lien de sauvegarde illisible</p>' +
       "<p>" + esc(message) + "</p>" +
-      "<p>Le lien a peut-être été coupé en route. Demandez-le à nouveau, ou utilisez plutôt le code (« Changer d'appareil »).</p>" +
+      "<p>Le lien a peut-être été coupé en route. Demandez-le à nouveau, ou utilisez plutôt le code (« Sauvegarde »).</p>" +
       '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="continuer">Continuer</button></div>');
     surAction("continuer", demarrer);
   }
 
   // ---------- Aide ----------
-  const AIDE =
+  const texteAide = () =>
     '<ul class="aide">' +
-    "<li>Choisissez un jeu, puis une région et un niveau : <strong>Facile</strong>, <strong>Moyen</strong> ou <strong>Expert</strong>.</li>" +
+    "<li>En haut de l'accueil, choisissez la carte : <strong>Le monde</strong> (pays et capitales) ou <strong>La France</strong> " +
+    "(départements, numéros et préfectures).</li>" +
+    "<li>Choisissez un jeu, puis une région et un niveau : <strong>Facile</strong>, <strong>Moyen</strong> ou <strong>Expert</strong>. " +
+    "« À la carte » vous laisse choisir ce qui est donné et ce qu'il faut trouver.</li>" +
     "<li>Pour vous déplacer sur la carte, faites-la glisser. Pour zoomer : deux doigts, la molette, ou les boutons + et −.</li>" +
-    "<li>Pour répondre, touchez " + esc(lib.unElement) + " : il devient orange. Validez avec le bouton, ou en le touchant une seconde fois.</li>" +
+    "<li>Pour répondre sur la carte, touchez " + esc(lib.unElement) + " : il devient orange. Validez avec le bouton, ou en le touchant une seconde fois.</li>" +
     "<li>Les tout petits " + esc(pluriel) + " ont une pastille ronde. Quand plusieurs sont collées, la carte zoome d'abord.</li>" +
-    "<li>Les " + esc(pluriel) + " ratés reviennent plus souvent. « Mon bilan » montre vos progrès.</li>" +
+    "<li>Les réponses tapées acceptent les fautes légères, les accents oubliés et les majuscules.</li>" +
+    "<li>Les " + esc(pluriel) + " ratés reviennent plus souvent. « Mon bilan » montre vos progrès, carte par carte.</li>" +
     "<li>Tout reste sur cet appareil : rien n'est envoyé sur internet.</li>" +
     "</ul>";
 
   function aide() {
     carteAuRepos();
-    ecran('<p class="titre-ecran">Comment jouer</p>' + AIDE +
+    ecran('<p class="titre-ecran">Comment jouer</p>' + texteAide() +
       '<p class="titre-ecran">Mettre le jeu sur l\'écran d\'accueil</p>' +
       '<ul class="aide">' +
-      "<li><strong>iPhone, iPad</strong> (Safari) : bouton Partager (carré avec une flèche vers le haut), puis « Sur l'écran d'accueil ».</li>" +
+      "<li><strong>iPhone, iPad</strong> : ouvrez le jeu dans <strong>Safari</strong> (pas depuis WhatsApp ou Gmail : utilisez « Ouvrir dans Safari »). " +
+      "Touchez le bouton Partager (carré avec une flèche vers le haut ; sur les iPhone récents, il est dans le menu « ⋯ »), " +
+      "<strong>faites défiler la liste vers le bas</strong>, puis « Sur l'écran d'accueil » (ou « Ajouter à l'écran d'accueil »). " +
+      "Si l'option « Ouvrir comme app web » apparaît, laissez-la <strong>cochée</strong>. " +
+      "Absent ? Tout en bas : « Modifier les actions… » pour l'ajouter.</li>" +
       "<li><strong>Android</strong> (Chrome) : menu ⋮ en haut à droite, puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».</li>" +
       "<li>Une fois installé, le jeu s'ouvre comme une application et marche aussi <strong>sans internet</strong>.</li>" +
       "<li>Sur iPhone, le jeu installé a sa propre mémoire, séparée de Safari : pour y retrouver une progression, " +
-      "utilisez « Changer d'appareil » → « Copier le code » dans Safari, puis collez le code dans le jeu installé.</li>" +
+      "utilisez « Sauvegarde » → « Copier le code » dans Safari, puis collez le code dans le jeu installé.</li>" +
       "</ul>" +
       '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="retour">J\'ai compris</button></div>', true);
     surAction("retour", () => accueil());
@@ -147,8 +185,8 @@
   function bienvenue() {
     carteAuRepos();
     ecran('<p class="titre-ecran">Bienvenue !</p>' +
-      "<p>Ce jeu vous aide à apprendre où sont les " + esc(pluriel) + " du monde et leurs " + esc(lib.capitales) + ".</p>" +
-      AIDE +
+      "<p>Ce jeu vous aide à apprendre où sont les pays du monde et leurs capitales, ainsi que les départements français.</p>" +
+      texteAide() +
       '<form class="saisie-profil" autocomplete="off">' +
       '<label for="prenom" class="etiquette">Pour commencer, quel est votre prénom ?</label>' +
       '<div class="saisie"><input id="prenom" type="text" maxlength="20" autocomplete="given-name" enterkeyhint="go">' +
@@ -208,24 +246,43 @@
   function accueil() {
     if (!joueur) return demarrer();
     carteAuRepos();
-    const bouton = (mode, texte) => '<button class="bouton bouton-principal" data-action="' + mode + '">' + texte + "</button>";
+    // Espace insécable avant « ? » pour qu'il ne se retrouve pas seul à la ligne
+    const bouton = (mode, texte) => '<button class="bouton bouton-principal" data-action="' + mode + '">' +
+      texte.replace(/ \?$/, " ?") + "</button>";
     ecran('<div class="entete-accueil"><span>Bonjour <strong>' + esc(joueur) + "</strong> !</span>" +
       '<button class="bouton-lien" data-action="joueurs">Changer de joueur</button></div>' +
+      '<div class="choix choix-jeu" role="group" aria-label="Carte">' +
+      GeoJeu.catalogue.map((j) => '<button data-jeu="' + j.id + '" aria-pressed="' + (j.id === jeu.id) + '">' + esc(j.titre) + "</button>").join("") +
+      "</div>" +
       '<p class="etiquette">' + esc(majuscule(lib.lesElements)) + "</p>" +
       '<div class="grille-jeux">' + bouton("localiser", "Où se trouve ce " + esc(lib.element) + " ?") +
       bouton("nommer", "Quel est ce " + esc(lib.element) + " ?") + "</div>" +
       '<p class="etiquette">' + esc(majuscule(lib.capitales)) + "</p>" +
       '<div class="grille-jeux">' + bouton("capitale", "Quelle est sa " + esc(lib.capitale) + " ?") +
       bouton("capitaleVersElement", "De quel " + esc(lib.element) + " est cette " + esc(lib.capitale) + " ?") + "</div>" +
+      (lib.numero
+        ? '<p class="etiquette">' + esc(majuscule(lib.numero)) + "s</p>" +
+          '<div class="grille-jeux">' + bouton("numero", "Quel est son " + esc(lib.numero) + " ?") +
+          bouton("numeroVersElement", "Quel " + esc(lib.element) + " porte ce " + esc(lib.numero) + " ?") + "</div>"
+        : "") +
+      '<p class="etiquette">Tout ensemble</p>' +
+      '<button class="bouton bouton-principal bouton-large" data-action="alaCarte">À la carte' +
+      "<span>Choisissez ce qui est donné et ce qu'il faut trouver</span></button>" +
       '<div class="liens-accueil">' +
       '<button class="bouton-lien" data-action="bilan">Mon bilan</button>' +
-      '<button class="bouton-lien" data-action="explorer">Explorer la carte</button>' +
+      '<button class="bouton-lien" data-action="explorer">Explorer</button>' +
       '<button class="bouton-lien" data-action="aide">Aide</button>' +
-      '<button class="bouton-lien" data-action="sauvegarde">Changer d\'appareil</button>' +
-      (demandeInstallation ? '<button class="bouton-lien" data-action="installer">Installer le jeu</button>' : "") +
+      '<button class="bouton-lien" data-action="sauvegarde" title="Changer d\'appareil">Sauvegarde</button>' +
+      (demandeInstallation ? '<button class="bouton-lien" data-action="installer">Installer</button>' : "") +
       "</div>", true);
     surAction("installer", installer);
-    for (const mode of ["localiser", "nommer", "capitale", "capitaleVersElement"]) surAction(mode, () => preparer(mode));
+    panneau.querySelectorAll("[data-jeu]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.getAttribute("data-jeu");
+      if (id !== jeu.id) ouvrirJeu(id).then(accueil);
+    }));
+    for (const mode of ["localiser", "nommer", "capitale", "capitaleVersElement", "numero", "numeroVersElement", "alaCarte"]) {
+      surAction(mode, () => preparer(mode));
+    }
     surAction("joueurs", quiJoue);
     surAction("bilan", () => bilan("carte"));
     surAction("explorer", explorer);
@@ -236,12 +293,12 @@
   // ---------- Changer d'appareil : code de sauvegarde ----------
   function sauvegarde() {
     carteAuRepos();
-    ecran('<p class="titre-ecran">Changer d\'appareil</p>' +
+    ecran('<p class="titre-ecran">Sauvegarde : changer d\'appareil</p>' +
       "<p>Pour retrouver la progression de <strong>" + esc(joueur) + "</strong> sur un autre téléphone ou ordinateur :</p>" +
       '<ol class="aide"><li>Touchez « Préparer l\'envoi ».</li>' +
       "<li>« Envoyer » ouvre le partage du téléphone (message, e-mail…). Vous pouvez aussi copier le lien, ou le code.</li>" +
       "<li>Sur l'autre appareil, touchez le lien reçu : le jeu s'ouvre et propose l'import. " +
-      "Avec le code : « Changer d'appareil », puis collez-le en bas de l'écran.</li></ol>" +
+      "Avec le code : « Sauvegarde », puis collez-le en bas de l'écran.</li></ol>" +
       '<button class="bouton bouton-principal" data-action="creer">Préparer l\'envoi</button>' +
       '<div class="zone-code" hidden><div class="rangee-boutons">' +
       (navigator.share ? '<button class="bouton bouton-principal" data-action="partager">Envoyer…</button>' : "") +
@@ -345,7 +402,7 @@
         carte.marquer(el.id, "choisi");
         const region = jeu.regions.find((r) => r.id === el.cont);
         const caps = el.cap.map((c) => c[0]);
-        html = '<p class="fiche-nom">' + esc(el.nom) + "</p>" +
+        html = '<p class="fiche-nom">' + esc(el.nom) + (el.num ? " <span class=\"numero\">(" + esc(el.num) + ")</span>" : "") + "</p>" +
           "<p>" + esc(majuscule(caps.length > 1 ? lib.capitales : lib.capitale)) + " : <strong>" + esc(caps.join(", ")) + "</strong>" +
           " · " + esc(region ? region.nom : "") + "</p>";
         if (el.capNote) html += '<p class="statut">' + esc(el.capNote) + "</p>";
@@ -359,20 +416,57 @@
   // ---------- Réglages avant la partie : région et niveau ----------
 
   function lireReglages() {
-    const r = profils.reglages(joueur, jeu.id);
-    if (r && jeu.regions.some((x) => x.id === r.region) && jeu.niveaux.some((x) => x.id === r.niveau)) return r;
-    return { region: "tout", niveau: jeu.niveaux[0].id };
+    let r = profils.reglages(joueur, jeu.id);
+    if (!(r && jeu.regions.some((x) => x.id === r.region) && jeu.niveaux.some((x) => x.id === r.niveau))) {
+      r = { region: "tout", niveau: jeu.niveaux[0].id };
+    }
+    // Mode « à la carte » : par défaut, une information au hasard et toutes les autres à trouver
+    const infos = GeoJeu.modes.alaCarte.infos(jeu);
+    const a = r.alaCarte;
+    if (!(a && (a.donne === "hasard" || infos.includes(a.donne)) && Array.isArray(a.trouver) && a.trouver.every((t) => infos.includes(t)))) {
+      r.alaCarte = { donne: "hasard", trouver: infos.slice() };
+    }
+    return r;
+  }
+
+  // Le mode « à la carte » se règle avant chaque partie ; les autres modes sont fixes
+  function modeDe(idMode) {
+    return idMode === "alaCarte" ? GeoJeu.modes.alaCarte.configurer(jeu, reglages.alaCarte) : GeoJeu.modes[idMode];
+  }
+
+  // Ce qui reste à trouver avec les réglages « à la carte » (vide = réglage impossible)
+  function aTrouverAlaCarte() {
+    const a = reglages.alaCarte;
+    return a.trouver.filter((t) => a.donne === "hasard" || t !== a.donne);
+  }
+
+  function reglagesAlaCarte() {
+    const a = reglages.alaCarte;
+    const alaCarte = GeoJeu.modes.alaCarte;
+    const infos = alaCarte.infos(jeu);
+    return '<p class="etiquette" id="etq-donne">On vous donne</p>' +
+      '<div class="choix" role="group" aria-labelledby="etq-donne">' +
+      ["hasard"].concat(infos).map((i) => '<button data-donne="' + i + '" aria-pressed="' + (i === a.donne) + '">' +
+        esc(i === "hasard" ? "Au hasard" : alaCarte.nomInfo(jeu, i)) + "</button>").join("") + "</div>" +
+      '<p class="etiquette" id="etq-trouver">À trouver</p>' +
+      '<div class="choix" role="group" aria-labelledby="etq-trouver">' +
+      infos.filter((i) => a.donne === "hasard" || i !== a.donne).map((i) => '<button data-trouver="' + i + '" aria-pressed="' +
+        a.trouver.includes(i) + '">' + esc(alaCarte.nomInfo(jeu, i)) + "</button>").join("") + "</div>" +
+      (aTrouverAlaCarte().length ? "" : '<p class="message-erreur">Choisissez au moins une information à trouver.</p>');
   }
 
   function niveauActuel() {
     return jeu.niveaux.find((n) => n.id === reglages.niveau);
   }
 
-  // Zone de carte d'une région : son cadre, et quels éléments en font partie (les autres sont estompés)
+  // Zone de carte d'une région : son cadre, et quels éléments en font partie (les autres sont estompés).
+  // Sans cadre dans les réglages (régions françaises), il est calculé à partir de ses éléments.
   function zoneDe(idRegion) {
     const region = jeu.regions.find((r) => r.id === idRegion);
-    if (!region || !region.cadre) return null;
-    return Object.assign({}, region, { contient: (el) => GeoJeu.selection.dansRegion(el, region.id) });
+    if (!region || region.id === "tout") return null;
+    const contient = (el) => GeoJeu.selection.dansRegion(el, region.id);
+    const cadre = region.cadre || carte.cadreDe(contient);
+    return cadre ? Object.assign({}, region, { cadre: cadre, contient: contient }) : null;
   }
 
   function elementsDeLaPartie(niveau) {
@@ -397,8 +491,10 @@
         jeu.niveaux.map((n) => '<button data-niveau="' + n.id + '" aria-pressed="' + (n.id === nv.id) + '">' + esc(n.nom) + "</button>").join("") +
         "</div>" +
         '<p class="description-niveau">' + esc(nv.description) + " (" + elementsDeLaPartie(nv).length + " " + esc(pluriel) + " possibles)</p>" +
-        '<div class="rangee-boutons">' +
-        '<button class="bouton bouton-principal" data-action="commencer">Commencer</button>' +
+        (idMode === "alaCarte" ? reglagesAlaCarte() : "") +
+        '<div class="rangee-boutons barre-actions">' +
+        '<button class="bouton bouton-principal" data-action="commencer"' +
+        (idMode === "alaCarte" && !aTrouverAlaCarte().length ? " disabled" : "") + ">Commencer</button>" +
         '<button class="bouton" data-action="retour">Retour</button></div>', true);
 
       panneau.querySelectorAll("[data-region]").forEach((b) => b.addEventListener("click", () => {
@@ -407,6 +503,16 @@
       }));
       panneau.querySelectorAll("[data-niveau]").forEach((b) => b.addEventListener("click", () => {
         reglages.niveau = b.getAttribute("data-niveau");
+        afficher();
+      }));
+      panneau.querySelectorAll("[data-donne]").forEach((b) => b.addEventListener("click", () => {
+        reglages.alaCarte.donne = b.getAttribute("data-donne");
+        afficher();
+      }));
+      panneau.querySelectorAll("[data-trouver]").forEach((b) => b.addEventListener("click", () => {
+        const info = b.getAttribute("data-trouver");
+        const t = reglages.alaCarte.trouver;
+        reglages.alaCarte.trouver = t.includes(info) ? t.filter((x) => x !== info) : t.concat(info);
         afficher();
       }));
       surAction("commencer", () => {
@@ -427,7 +533,7 @@
       jeu: jeu,
       carte: carte,
       panneau: panneau,
-      mode: GeoJeu.modes[idMode],
+      mode: modeDe(idMode),
       elements: elementsDeLaPartie(nv),
       nbQuestions: nv.nb,
       strict: !!nv.strict,
@@ -457,10 +563,10 @@
     { id: "a-revoir", nom: "À revoir", pluriel: "À revoir" },
     { id: "nouveau", nom: "Jamais demandé", pluriel: "Jamais demandés" }
   ];
-  const COMPETENCES = [
+  const competences = () => [
     { id: "carte", nom: "Carte des " + pluriel },
     { id: "capitale", nom: majuscule(lib.capitales) }
-  ];
+  ].concat(lib.numero ? [{ id: "numero", nom: majuscule(lib.numero) + "s" }] : []);
 
   function bilan(competence) {
     carteAuRepos();
@@ -490,7 +596,7 @@
 
     ecran('<p class="titre-ecran">Bilan de ' + esc(joueur) + "</p>" +
       '<div class="choix" role="group" aria-label="Compétence">' +
-      COMPETENCES.map((c) => '<button data-competence="' + c.id + '" aria-pressed="' + (c.id === competence) + '">' + esc(c.nom) + "</button>").join("") +
+      competences().map((c) => '<button data-competence="' + c.id + '" aria-pressed="' + (c.id === competence) + '">' + esc(c.nom) + "</button>").join("") +
       "</div>" +
       '<ul class="legende">' +
       ETATS.map((e) => '<li><span class="echantillon echantillon-' + e.id + '"></span>' + esc(e.pluriel) + " : <strong>" + total[e.id] + "</strong></li>").join("") +
@@ -543,5 +649,11 @@
     });
   }
 
-  demarrer();
+  // Démarrage : on ouvre le dernier jeu du joueur, puis on affiche le bon écran
+  ouvrirJeu(jeuDuJoueur(profils.actif())).then(() => {
+    document.getElementById("message-chargement").remove();
+    demarrer();
+  }, (e) => {
+    document.querySelector("#message-chargement p").textContent = "Le jeu n'a pas pu se charger : " + e.message;
+  });
 })();

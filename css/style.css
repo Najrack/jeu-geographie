@@ -24,6 +24,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -71,6 +72,8 @@ button { font: inherit; cursor: pointer; }
 svg.carte { position: absolute; inset: 0; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 
 .ocean { fill: var(--ocean); }
+.cadre-encart { fill: #e6eff5; stroke: #8fa9ba; stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cadre-encart.hors-zone { stroke: #c7d5de; }
 .graticule { fill: none; stroke: var(--graticule); stroke-width: .5; vector-effect: non-scaling-stroke; pointer-events: none; }
 .territoire { fill: url(#hachures); stroke: var(--frontiere); stroke-width: .4; vector-effect: non-scaling-stroke; }
 .hachures-fond { fill: var(--territoire); }
@@ -170,6 +173,23 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 }
 .saisie input:focus { outline: 3px solid var(--cible); outline-offset: 1px; border-color: var(--primaire); }
 .saisie .bouton { margin-top: 0; }
+/* Mode « Nom, capitale et carte » */
+.champ-trio { display: block; margin-top: .4rem; }
+.champ-trio span { display: block; font-size: .9rem; color: var(--texte-doux); }
+.champ-trio input {
+  width: 100%; min-height: 46px; padding: 0 .8rem; font: inherit; font-size: 1.15rem;
+  border: 2px solid var(--frontiere); border-radius: var(--rayon);
+}
+.champ-trio input:focus { outline: 3px solid var(--cible); outline-offset: 1px; border-color: var(--primaire); }
+.etape-trio { font-weight: 600; }
+.etape-trio::before { content: "☐ "; }
+.etape-trio.fait::before { content: "✓ "; color: var(--juste); }
+.form-trio .bouton { width: 100%; }
+.detail-trio { list-style: none; padding: 0; margin: .3rem 0; }
+.detail-trio li { margin: .25rem 0; }
+.detail-trio li.ok { color: var(--juste); }
+.detail-trio li.ko { color: #a63c00; }
+.detail-trio li strong { color: var(--texte); }
 .pastille-legende { display: inline-block; width: .8em; height: .8em; border-radius: 50%; vertical-align: -.05em; border: 2px solid #5a3d00; }
 .pastille-cible { background: var(--cible); }
 .aide-validation { font-size: .85rem; color: var(--texte-doux); }
@@ -188,8 +208,13 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 .choix button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
 /* Accueil, joueurs, aide, sauvegarde */
 .entete-accueil { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: 1.1rem; }
+.choix-jeu { margin: .4rem 0 .1rem; }
+.choix-jeu button { flex: 1; font-size: 1rem; }
+.fiche-nom .numero { color: var(--texte-doux); font-weight: 400; }
 .grille-jeux { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
 .grille-jeux .bouton { margin-top: 0; padding: .5rem .6rem; line-height: 1.25; }
+.bouton-large { display: block; width: 100%; margin-top: 0; padding: .5rem .8rem; line-height: 1.25; }
+.bouton-large span { display: block; font-weight: 400; font-size: .85rem; opacity: .9; }
 .liens-accueil { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: .4rem; }
 .aide { padding-left: 1.2rem; margin: .4rem 0; }
 .aide li { margin: .3rem 0; }
@@ -226,6 +251,12 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 .ligne-total th, .ligne-total td { font-weight: 700; border-bottom: none; }
 .barre-maitrise { display: block; width: 4.5rem; height: 6px; margin-top: 3px; border-radius: 3px; background: #e3dfd5; overflow: hidden; }
 .barre-maitrise span { display: block; height: 100%; background: var(--juste); }
+/* Boutons qui restent visibles en bas d'un long écran (réglages) */
+.barre-actions {
+  position: sticky; bottom: -.8rem; z-index: 1;
+  margin: .4rem -1rem -.8rem; padding: .2rem 1rem .8rem;
+  background: var(--panneau); box-shadow: 0 -6px 8px -6px rgba(0, 0, 0, .15);
+}
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
 .rangee-boutons .bouton { flex: 1 1 12rem; }
 
@@ -233,4 +264,12 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   :root { font-size: 17px; }
   .barre h1 { font-size: 1rem; }
   .question-nom { font-size: 1.4rem; }
+  /* Accueil plus compact pour tenir sans défiler sur un téléphone */
+  .etiquette { margin: .3rem 0 .1rem; font-size: .88rem; }
+  .grille-jeux .bouton { font-size: .9rem; padding: .35rem .5rem; }
+  .bouton-large span { display: none; }
+  .liens-accueil { gap: 0 .7rem; }
+  .liens-accueil .bouton-lien { font-size: .88rem; }
+  .choix-jeu { margin: .25rem 0 0; }
+  .tableau-bilan tbody th { font-size: .85rem; }
 }

@@ -15,7 +15,15 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 
 ## Architecture
 - `js/moteur/` ne connaît aucun pays : tout vient du jeu de données (`donnees/<jeu>/config.js`, liste d'éléments, fond de carte TopoJSON).
-- Phase 2 (France, départements : nom, numéro, préfecture) = un nouveau dossier `donnees/france/`, sans réécrire le moteur. Ne pas commencer sans demande.
+- Jeux de données listés dans `donnees/catalogue.js`, chargés à la demande (`GeoJeu.charger`). Fond de carte TopoJSON (`topo`) ou GeoJSON (`geo` + `cleForme`), projection(s) et encarts décrits dans chaque config.
+
+## Phase 2 : la France (commencée le 21/10/2026)
+Décisions : 101 départements (96 + 5 DROM en encarts, sans distance affichée pour eux) ; Corse 2A/2B (20 refusé) ;
+Rhône (69) = une zone avec la Métropole de Lyon ; 67 et 68 séparés ; niveaux par notoriété (n = 1 : ~30).
+Étapes : A données ✔ ; B moteur (choix de la carte à l'accueil, GeoJSON, projection conique, encarts, régions calculées) ✔ ;
+C ✔ modes `numero` / `numeroVersElement` (compétence « numero ») + mode `alaCarte` (réglages `alaCarte: { donne, trouver }`
+par joueur et par jeu ; remplace le mode trio, aussi pour le monde) ;
+D finitions ✔ (aide pour les deux cartes, accueil compact sur téléphone, lien « Sauvegarde », descriptions). Phase 2 terminée.
 
 ## Périmètre (décidé le 21/10/2026)
 - 193 membres de l'ONU + Vatican, Palestine, Kosovo, Taïwan, chacun avec une mention « statut particulier ».
@@ -31,6 +39,8 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 ## Synchronisation (décidé le 21/10/2026)
 Pas de synchronisation en ligne (pas de serveur ni de service tiers) : transfert par lien, partage ou code, avec fusion. Le code ne peut pas être court ni mémorisable puisqu'il contient les données elles-mêmes.
 11. Défi du jour : abandonné à la demande du propriétaire (21/10/2026), ne pas le réintroduire 12. PWA hors ligne + mise en ligne ✔ (`manifest.webmanifest`, `sw.js`, `icones/`)
+
+Ajout demandé après l'étape 12 : mode « Nom, capitale et carte », remplacé en phase 2 par le mode « à la carte » (`GeoJeu.modes.alaCarte`).
 
 ## Règles pour chaque modification (depuis l'étape 12)
 - Augmenter `VERSION` dans `sw.js` (planisphere-v1, v2…) à chaque changement d'un fichier du jeu, sinon les appareils gardent l'ancienne copie.

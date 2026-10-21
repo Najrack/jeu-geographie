@@ -23,6 +23,11 @@
     return "à environ " + (Math.round(km / pas) * pas).toLocaleString("fr-FR") + " km";
   }
 
+  // « , à environ 350 km de votre choix », ou rien si la distance n'a pas de sens (encart d'outre-mer)
+  function avecDistance(km, suite) {
+    return km == null ? "" : ", " + texteDistance(km) + suite;
+  }
+
   class Partie {
     // options : { jeu, carte, panneau, mode, elements, nbQuestions, progression, strict, quandFini }
     //   strict : orthographe moins tolérante dans les réponses tapées.
@@ -48,6 +53,7 @@
       this.carte.effacerMarques();
       if (this.index >= this.questions.length) return this.terminer();
       this.enAttente = true;
+      this.panneau.classList.toggle("panneau-grand", !!this.mode.panneauGrand);
       this.mode.poser(this, this.questions[this.index]);
     }
 
@@ -60,14 +66,18 @@
       this.panneau.innerHTML = this.entete() + html;
     }
 
-    // Appelé par le mode une fois la réponse jugée
-    resultat(juste, html) {
+    // Appelé par le mode une fois la réponse jugée.
+    // parCompetence (facultatif) : { carte: vrai/faux, capitale: vrai/faux } pour un mode qui en fait travailler plusieurs
+    resultat(juste, html, parCompetence) {
       if (!this.enAttente) return;
       this.enAttente = false;
       if (juste) this.score++;
       const id = this.questions[this.index].id;
       this.resultats.push({ id: id, juste: juste });
-      if (this.progression) this.progression.noter(this.mode.competence, id, juste);
+      if (this.progression) {
+        const notes = parCompetence || { [this.mode.competence]: juste };
+        for (const c in notes) this.progression.noter(c, id, notes[c]);
+      }
       this.afficher('<div class="retour ' + (juste ? "retour-juste" : "retour-faux") + '">' + html + "</div>" +
         '<button class="bouton bouton-principal" data-action="suivante">' +
         (this.index + 1 < this.questions.length ? "Question suivante" : "Voir le résultat") + "</button>");
@@ -77,6 +87,7 @@
     }
 
     terminer() {
+      this.panneau.classList.remove("panneau-grand");
       this.carte.auClic = function () {};
       this.carte.reinitialiserZoom();
       if (this.quandFini) this.quandFini(this);
@@ -132,7 +143,7 @@
       } else {
         carte.marquer(clic.id, "faux");
         html = '<p class="verdict">✗ Raté</p><p>Vous avez choisi : <strong>' + esc(clic.element.nom) + "</strong>.</p>" +
-          "<p><strong>" + esc(el.nom) + "</strong> (en bleu) était " + texteDistance(carte.distanceKm(el.id, clic.lonlat)) + ".</p>";
+          "<p><strong>" + esc(el.nom) + "</strong> est en bleu" + avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
       }
       if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
@@ -300,8 +311,8 @@
       } else {
         carte.marquer(clic.id, "faux");
         html = '<p class="verdict">✗ Raté</p>' +
-          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu), " +
-          texteDistance(carte.distanceKm(el.id, clic.lonlat)) + " de votre choix.</p>" +
+          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu)" +
+          avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>" +
           '<p class="statut">Vous avez choisi : ' + esc(clic.element.nom) + " (" + esc(jeu.libelles.capitale) + " : " +
           esc(clic.element.cap.map((c) => c[0]).join(", ")) + ").</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
@@ -311,6 +322,283 @@
       partie.resultat(juste, html);
     }
   };
+
+  // ---------- Numéros (départements) ----------
+  function avecNumero(elements) {
+    return elements.filter((e) => e.num);
+  }
+
+  // Mode « Quel est son numéro ? » : l'élément est nommé et coloré, on tape son numéro
+  GeoJeu.modes.numero = {
+    nom: function (jeu) { return "Quel est son " + jeu.libelles.numero + " ?"; },
+    competence: "numero",
+    filtrer: avecNumero,
+
+    poser: function (partie, el) {
+      const lib = partie.jeu.libelles;
+      partie.carte.marquer(el.id, "cible");
+      partie.carte.cadrer(el.id);
+      saisirTexte(partie,
+        '<p class="consigne">Quel est le ' + esc(lib.numero) + " de ce " + esc(lib.element) + " ?</p>" +
+        '<p class="question-nom">' + esc(el.nom) + "</p>",
+        majusculeInitiale(lib.numero),
+        (texte) => this.repondre(partie, el, texte));
+    },
+
+    repondre: function (partie, el, texte) {
+      const lib = partie.jeu.libelles;
+      const trouve = texte == null ? null : GeoJeu.reponses.reconnaitreNumero(texte, partie.jeu.elements);
+      const juste = !!trouve && trouve.id === el.id;
+      partie.carte.marquer(el.id, "juste");
+      let html;
+      if (juste) {
+        html = '<p class="verdict">✓ Bravo !</p><p><strong>' + esc(el.nom) + "</strong> : " + esc(el.num) + "</p>";
+      } else {
+        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>" +
+          "<p><strong>" + esc(el.nom) + "</strong> : c'était le <strong>" + esc(el.num) + "</strong>.</p>";
+        if (trouve) {
+          partie.carte.marquer(trouve.id, "faux");
+          html += "<p>Votre réponse, " + esc(trouve.num) + " : " + esc(trouve.nom) + " (en orange hachuré).</p>";
+        } else if (texte != null) {
+          html += "<p>« " + esc(texte.trim()) + " » n'est le " + esc(lib.numero) + " d'aucun " + esc(lib.element) + ".</p>";
+        }
+      }
+      partie.resultat(juste, html);
+    }
+  };
+
+  // Mode « Quel département porte ce numéro ? » : on touche l'élément sur la carte
+  GeoJeu.modes.numeroVersElement = {
+    nom: function (jeu) { return "Quel " + jeu.libelles.element + " porte ce " + jeu.libelles.numero + " ?"; },
+    competence: "numero",
+    filtrer: avecNumero,
+
+    poser: function (partie, el) {
+      const lib = partie.jeu.libelles;
+      partie.carte.annulerZoomAuto();
+      choisirSurCarte(partie,
+        '<p class="consigne">Quel ' + esc(lib.element) + " porte le " + esc(lib.numero) + " :</p>" +
+        '<p class="question-nom">' + esc(el.num) + "</p>",
+        (clic) => this.repondre(partie, el, clic));
+    },
+
+    repondre: function (partie, el, clic) {
+      const carte = partie.carte;
+      const juste = clic.id === el.id;
+      carte.marquer(el.id, "juste");
+      let html;
+      if (juste) {
+        html = '<p class="verdict">✓ Bravo !</p><p>' + esc(el.num) + " : <strong>" + esc(el.nom) + "</strong></p>";
+      } else {
+        carte.marquer(clic.id, "faux");
+        html = '<p class="verdict">✗ Raté</p>' +
+          "<p>" + esc(el.num) + " : c'était <strong>" + esc(el.nom) + "</strong> (en bleu)" +
+          avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>" +
+          '<p class="statut">Vous avez choisi : ' + esc(clic.element.nom) + " (" + esc(clic.element.num) + ").</p>";
+        if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
+      }
+      partie.resultat(juste, html);
+    }
+  };
+
+  // ---------- Mode « à la carte » : une information est donnée, le joueur trouve celles qu'il a choisies ----------
+  // Informations possibles d'un élément, et la compétence que le joueur montre en la trouvant
+  const COMPETENCE_INFO = { nom: "carte", carte: "carte", capitale: "capitale", numero: "numero" };
+
+  function infosDuJeu(jeu) {
+    return jeu.libelles.numero ? ["nom", "numero", "capitale", "carte"] : ["nom", "capitale", "carte"];
+  }
+
+  function nomInfo(jeu, info) {
+    const lib = jeu.libelles;
+    return { nom: "Le nom", numero: "Le " + lib.numero, capitale: "La " + lib.capitale, carte: "La carte" }[info];
+  }
+
+  GeoJeu.modes.alaCarte = {
+    nom: function () { return "À la carte"; },
+    panneauGrand: true, // jusqu'à trois champs et un bouton : le panneau peut prendre plus de hauteur
+    infos: infosDuJeu,
+    nomInfo: nomInfo,
+
+    // Version du mode pour des réglages donnés : { donne: "hasard" | info, trouver: [infos] }
+    configurer: function (jeu, options) {
+      const enJeu = new Set(options.trouver.concat(options.donne === "hasard" ? infosDuJeu(jeu) : [options.donne]));
+      return Object.assign(Object.create(this), {
+        options: options,
+        competence: [...new Set([...enJeu].map((i) => COMPETENCE_INFO[i]))],
+        filtrer: (elements) => elements.filter((e) =>
+          (!enJeu.has("capitale") || (e.cap && e.cap.length)) && (!enJeu.has("numero") || e.num))
+      });
+    },
+
+    poser: function (partie, el) {
+      const jeu = partie.jeu;
+      const lib = jeu.libelles;
+      const carte = partie.carte;
+      const opts = this.options;
+      let donne = opts.donne;
+      if (donne === "hasard") {
+        // Au hasard, mais il doit rester au moins une chose à trouver
+        const possibles = infosDuJeu(jeu).filter((i) => opts.trouver.some((t) => t !== i));
+        donne = possibles[Math.floor(Math.random() * possibles.length)];
+      }
+      const aTrouver = infosDuJeu(jeu).filter((i) => i !== donne && opts.trouver.includes(i));
+      const capitale = el.cap && el.cap.length ? el.cap[Math.floor(Math.random() * el.cap.length)][0] : "";
+      const champ = (cle, etiquette) => '<label class="champ-trio"><span>' + esc(etiquette) + "</span>" +
+        '<input data-champ="' + cle + '" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"></label>';
+
+      let html;
+      if (donne === "carte") {
+        carte.marquer(el.id, "cible");
+        carte.cadrer(el.id);
+        html = '<p class="consigne">Ce ' + esc(lib.element) + ' <span class="pastille-legende pastille-cible"></span> en orange :</p>';
+      } else {
+        carte.annulerZoomAuto();
+        const donnee = { nom: el.nom, capitale: capitale, numero: el.num }[donne];
+        const intro = { nom: "Ce " + lib.element, capitale: "Cette " + lib.capitale, numero: "Le " + lib.element + " " + lib.numero }[donne];
+        html = '<p class="consigne">' + esc(intro) + " :</p>" + '<p class="question-nom">' + esc(donnee) + "</p>";
+      }
+      for (const info of aTrouver) {
+        if (info === "carte") {
+          html += '<p class="etape-trio" data-etape-carte>' +
+            (donne === "nom" ? "Touchez-le" : "Touchez son " + esc(lib.element)) + " sur la carte</p>";
+        } else if (info === "nom") html += champ("nom", donne === "carte" ? "Son nom" : "Le nom du " + lib.element);
+        else if (info === "capitale") html += champ("capitale", "Sa " + lib.capitale);
+        else if (info === "numero") html += champ("numero", "Son " + lib.numero);
+      }
+      partie.afficher('<form class="form-trio" autocomplete="off">' + html +
+        '<button type="submit" class="bouton bouton-principal">Valider</button>' +
+        '<p class="message-erreur" role="alert"></p></form>' +
+        '<button type="button" class="bouton-lien" data-action="passer">Je ne sais pas</button>');
+
+      const form = partie.panneau.querySelector("form");
+      const champs = [...form.querySelectorAll("input")];
+      const avecCarte = aTrouver.includes("carte");
+      let choix = null;
+      if (!avecCarte) {
+        if (champs[0]) champs[0].focus({ preventScroll: true });
+      } else {
+        // Un toucher sélectionne (en orange) ; un autre toucher change de choix
+        carte.auClic = (clic) => {
+          if (choix) carte.marquer(choix.id, null);
+          choix = clic.id ? clic : null;
+          if (choix) carte.marquer(choix.id, "choisi");
+          form.querySelector("[data-etape-carte]").classList.toggle("fait", !!choix);
+        };
+      }
+      // Entrée dans un champ passe au champ suivant encore vide, plutôt que de valider trop tôt
+      champs.forEach((c, i) => c.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        const suivant = champs.slice(i + 1).find((x) => !x.value.trim());
+        if (suivant) { e.preventDefault(); suivant.focus(); }
+      }));
+      const valeur = (cle) => {
+        const c = form.querySelector('[data-champ="' + cle + '"]');
+        return c ? c.value : null;
+      };
+      const fin = (reponse) => {
+        carte.auClic = function () {};
+        if (document.activeElement) document.activeElement.blur(); // referme le clavier du téléphone
+        this.repondre(partie, el, donne, aTrouver, reponse);
+      };
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (avecCarte && !choix) {
+          form.querySelector(".message-erreur").textContent = "Touchez d'abord le " + lib.element + " sur la carte.";
+          return;
+        }
+        fin({ clic: choix, nom: valeur("nom"), capitale: valeur("capitale"), numero: valeur("numero") });
+      });
+      partie.panneau.querySelector('[data-action="passer"]').addEventListener("click", () => fin(null));
+    },
+
+    // Chaque information demandée est jugée à part ; le point n'est gagné que si tout est juste
+    repondre: function (partie, el, donne, aTrouver, reponse) {
+      const jeu = partie.jeu;
+      const lib = jeu.libelles;
+      const carte = partie.carte;
+      const lignes = [];
+      const ligne = (ok, etiquette, texte) => lignes.push('<li class="' + (ok ? "ok" : "ko") + '">' + (ok ? "✓ " : "✗ ") +
+        "<strong>" + esc(etiquette) + " :</strong> " + texte + "</li>");
+      const tape = (t) => (t && t.trim() ? " (vous avez écrit « " + esc(t.trim()) + " »)" : "");
+      carte.marquer(el.id, "juste");
+      const resultats = {}; // info -> juste ou faux
+
+      if (aTrouver.includes("carte")) {
+        const carteOk = resultats.carte = !!reponse && reponse.clic.id === el.id;
+        if (carteOk) ligne(true, "Sur la carte", "bien placé");
+        else if (reponse) {
+          carte.marquer(reponse.clic.id, "faux");
+          ligne(false, "Sur la carte", "vous avez choisi " + esc(reponse.clic.element.nom) +
+            avecDistance(carte.distanceKm(el.id, reponse.clic.lonlat), " du bon endroit") + " ; le bon est en bleu");
+        } else ligne(false, "Sur la carte", "en bleu");
+        if (!carteOk && carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
+      }
+      if (aTrouver.includes("nom")) {
+        const t = reponse && reponse.nom;
+        const trouve = t ? GeoJeu.reponses.reconnaitre(t, entreesNoms(jeu), el.id, partie.strict) : null;
+        const nomOk = resultats.nom = !!trouve && trouve.id === el.id;
+        let texte = esc(el.nom);
+        if (nomOk) texte += trouve.exact ? "" : " (on l'écrit ainsi)";
+        else {
+          texte = "c'était " + texte + tape(t);
+          if (trouve) {
+            carte.marquer(trouve.id, "faux");
+            texte += " : " + esc(trouve.nom) + " est un autre " + esc(lib.element) + ", en orange hachuré";
+          }
+        }
+        ligne(nomOk, "Nom", texte);
+      }
+      if (aTrouver.includes("numero")) {
+        const t = reponse && reponse.numero;
+        const trouve = t ? GeoJeu.reponses.reconnaitreNumero(t, jeu.elements) : null;
+        const numOk = resultats.numero = !!trouve && trouve.id === el.id;
+        let texte = numOk ? esc(el.num) : "c'était " + esc(el.num) + tape(t);
+        if (!numOk && trouve) texte += " ; " + esc(trouve.num) + " : " + esc(trouve.nom);
+        ligne(numOk, majusculeInitiale(lib.numero), texte);
+      }
+      if (aTrouver.includes("capitale")) {
+        const t = reponse && reponse.capitale;
+        const trouve = t ? GeoJeu.reponses.reconnaitre(t, entreesCapitales(jeu), el.id, partie.strict) : null;
+        const capOk = resultats.capitale = !!trouve && trouve.id === el.id;
+        const toutes = esc(el.cap.map((c) => c[0]).join(", "));
+        let texte;
+        if (capOk) texte = esc(trouve.nom) + (el.cap.length > 1 ? " (" + esc(lib.capitales) + " : " + toutes + ")" : "");
+        else {
+          texte = "c'était " + toutes + tape(t);
+          if (trouve) texte += " : " + esc(trouve.nom) + " est la " + esc(lib.capitale) + " d'un autre " + esc(lib.element) +
+            " (" + esc(jeu.elements.find((e) => e.id === trouve.id).nom) + ")";
+        }
+        ligne(capOk, majusculeInitiale(lib.capitale), texte);
+      }
+
+      const notes = Object.values(resultats);
+      const juste = notes.every(Boolean);
+      const verdict = juste ? "✓ Bravo !" : notes.some(Boolean) ? "◐ En partie" : "✗ Raté";
+      let html = '<p class="verdict">' + verdict + "</p><p><strong>" + esc(el.nom) + "</strong>" +
+        (el.num ? " (" + esc(el.num) + ")" : "") + "</p>" +
+        '<ul class="detail-trio">' + lignes.join("") + "</ul>";
+      if (el.capNote && (donne === "capitale" || aTrouver.includes("capitale"))) html += '<p class="statut">' + esc(el.capNote) + "</p>";
+      if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
+
+      // Pour la répétition espacée : chaque information trouvée compte pour sa compétence.
+      // Si c'est la capitale ou le numéro qui était donné, retrouver l'élément (nom ou carte) montre qu'on le connaît.
+      const parCompetence = {};
+      for (const info in resultats) {
+        const c = COMPETENCE_INFO[info];
+        parCompetence[c] = (parCompetence[c] !== false) && resultats[info];
+      }
+      if (donne === "capitale" || donne === "numero") {
+        const identifie = ["nom", "carte"].filter((i) => i in resultats);
+        if (identifie.length) parCompetence[COMPETENCE_INFO[donne]] = identifie.some((i) => resultats[i]);
+      }
+      partie.resultat(juste, html, parCompetence);
+    }
+  };
+
+  function majusculeInitiale(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
 
   // ---------- Choix des éléments d'une partie ----------
 

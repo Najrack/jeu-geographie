@@ -1,7 +1,7 @@
 {
   "name": "Planisphère – jeu de géographie",
   "short_name": "Planisphère",
-  "description": "Apprendre où sont les pays du monde et leurs capitales.",
+  "description": "Apprendre où sont les pays du monde et leurs capitales, et les départements français avec leurs numéros et préfectures.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

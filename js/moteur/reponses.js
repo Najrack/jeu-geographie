@@ -60,5 +60,17 @@
     return meilleur && { id: meilleur.id, nom: meilleur.nom, exact: meilleur.d === 0 };
   }
 
-  GeoJeu.reponses = { normaliser: normaliser, distance: distance, reconnaitre: reconnaitre };
+  // Numéros (départements) : pas de tolérance aux fautes, mais « 1 » = « 01 », « 2a » = « 2A », espaces ignorés
+  function normaliserNumero(s) {
+    return String(s).toUpperCase().replace(/\s+/g, "").replace(/^0+(?=.)/, "");
+  }
+
+  // Renvoie l'élément qui porte ce numéro, ou null
+  function reconnaitreNumero(saisie, elements) {
+    const s = normaliserNumero(saisie);
+    if (!s) return null;
+    return elements.find((e) => e.num && normaliserNumero(e.num) === s) || null;
+  }
+
+  GeoJeu.reponses = { normaliser: normaliser, distance: distance, reconnaitre: reconnaitre, reconnaitreNumero: reconnaitreNumero };
 })();

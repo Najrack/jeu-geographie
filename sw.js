@@ -3,7 +3,7 @@
 // IMPORTANT : à chaque mise en ligne d'une nouvelle version, augmenter VERSION.
 // Les appareils voient alors que ce fichier a changé, téléchargent la nouvelle version
 // et l'utilisent à la prochaine ouverture du jeu.
-const VERSION = "planisphere-v1";
+const VERSION = "planisphere-v7";
 
 const FICHIERS = [
   "./",
@@ -18,9 +18,13 @@ const FICHIERS = [
   "js/moteur/modes.js",
   "js/moteur/progression.js",
   "js/moteur/profils.js",
+  "donnees/catalogue.js",
   "donnees/monde/config.js",
   "donnees/monde/pays.js",
   "donnees/monde/carte.js",
+  "donnees/france/config.js",
+  "donnees/france/departements.js",
+  "donnees/france/carte.js",
   "js/app.js",
   "icones/icone-180.png",
   "icones/icone-192.png",

@@ -10,6 +10,35 @@
   const DELAI_APRES_GESTE = 350; // ms pendant lesquelles un clic après un déplacement est ignoré
   const RAYON_TERRE_KM = 6371;
 
+  // Réunit les formes GeoJSON d'un élément en un seul MultiPolygon.
+  // d3 attend les contours extérieurs dans le sens des aiguilles d'une montre : on retourne ceux qui
+  // sont dans l'autre sens (sinon le polygone couvrirait toute la Terre sauf le département).
+  function fusionnerGeo(features) {
+    const polygones = [];
+    for (const f of features) {
+      const g = f.geometry;
+      for (const poly of g.type === "Polygon" ? [g.coordinates] : g.coordinates) {
+        const aEnvers = d3.geoArea({ type: "Polygon", coordinates: poly }) > 2 * Math.PI;
+        polygones.push(aEnvers ? poly.map((anneau) => anneau.slice().reverse()) : poly);
+      }
+    }
+    return { type: "MultiPolygon", coordinates: polygones };
+  }
+
+  // Déplace une géométrie autour d'un nouveau centre (encart) ; l'écart en longitude est corrigé
+  // selon la latitude pour que la forme ne soit pas écrasée ou étirée.
+  function deplacer(geometrie, encart) {
+    const c = d3.geoCentroid(geometrie);
+    const [x, y] = encart.vers;
+    const s = encart.echelle || 1;
+    const etirement = Math.cos(c[1] * Math.PI / 180) / Math.cos(y * Math.PI / 180);
+    const point = (p) => [x + (p[0] - c[0]) * s * etirement, y + (p[1] - c[1]) * s];
+    return {
+      type: "MultiPolygon",
+      coordinates: geometrie.coordinates.map((poly) => poly.map((anneau) => anneau.map(point)))
+    };
+  }
+
   class Carte {
     constructor(conteneur, jeu) {
       this.conteneur = conteneur;
@@ -34,6 +63,7 @@
         // Erreurs et pays « à revoir » : hachurés, pour ne pas reposer que sur la couleur
         '<pattern id="motif-faux" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
         '<rect width="6" height="6" class="motif-faux-fond"/><line x1="0" y1="0" x2="0" y2="6" class="motif-faux-trait"/></pattern>');
+      this.fondMer = this.svg.append("rect").attr("class", "ocean");
       this.g = this.svg.append("g");
 
       this.zoom = d3.zoom()
@@ -56,15 +86,23 @@
 
       this.dessiner();
       let attente = null;
-      new ResizeObserver(() => {
+      this.observateur = new ResizeObserver(() => {
         clearTimeout(attente);
         attente = setTimeout(() => {
           if (this.conteneur.clientWidth !== this.W || this.conteneur.clientHeight !== this.H) this.dessiner();
         }, 60);
-      }).observe(conteneur);
+      });
+      this.observateur.observe(conteneur);
+    }
+
+    // Retire la carte de la page (pour passer à un autre jeu de données)
+    detruire() {
+      this.observateur.disconnect();
+      this.svg.interrupt().remove();
     }
 
     // Regroupe les formes du fond de carte par élément du jeu (avec les rattachements du jeu de données).
+    // Le fond de carte est soit du TopoJSON (jeu.topo + jeu.objetCarte), soit du GeoJSON (jeu.geo + jeu.cleForme).
     preparerFormes() {
       const jeu = this.jeu;
       const topo = jeu.topo;
@@ -73,9 +111,10 @@
       const parElement = new Map(jeu.elements.map((el) => [el.id, []]));
       const autres = [];
 
-      for (const g of topo.objects[jeu.objetCarte].geometries) {
+      const formesBrutes = jeu.geo ? jeu.geo.features : topo.objects[jeu.objetCarte].geometries;
+      for (const g of formesBrutes) {
         const nom = g.properties && g.properties.name;
-        const cleForme = g.id || nom;
+        const cleForme = jeu.geo ? jeu.cleForme(g) : g.id || nom;
         if (ignorer.includes(cleForme)) continue;
         const cle = rattacher[cleForme] || cleForme;
         if (parElement.has(cle)) parElement.get(cle).push(g);
@@ -85,12 +124,17 @@
       this.formes = new Map();
       for (const el of jeu.elements) {
         const geoms = parElement.get(el.id);
-        const feature = geoms.length
-          ? { type: "Feature", id: el.id, geometry: topojson.merge(topo, geoms) }
-          : null;
+        let feature = null;
+        if (geoms.length) {
+          feature = { type: "Feature", id: el.id, geometry: jeu.geo ? fusionnerGeo(geoms) : topojson.merge(topo, geoms) };
+        }
+        // Territoire éloigné montré en encart (ex. outre-mer) : déplacé près du reste de la carte
+        const encart = jeu.encarts && jeu.encarts[el.id];
+        if (feature && encart) feature.geometry = deplacer(feature.geometry, encart);
         this.formes.set(el.id, {
           el: el,
           feature: feature,
+          encart: !!encart,
           aire: feature ? d3.geoArea(feature) : 0, // surface réelle (sert à classer du plus grand au plus petit)
           pt: el.pt || (feature ? d3.geoCentroid(feature) : null)
         });
@@ -99,8 +143,15 @@
       const noms = jeu.territoires || {};
       this.territoires = autres.map((o) => ({
         nom: noms[o.cle] || "Territoire non jouable",
-        feature: topojson.feature(topo, o.g)
+        feature: jeu.geo ? o.g : topojson.feature(topo, o.g)
       }));
+    }
+
+    // Cadre [[ouest, sud], [est, nord]] des éléments qui passent le filtre (pour montrer une région)
+    cadreDe(filtre) {
+      const features = [];
+      for (const f of this.formes.values()) if (f.feature && filtre(f.el)) features.push(f.feature);
+      return features.length ? d3.geoBounds({ type: "FeatureCollection", features: features }) : null;
     }
 
     changerProjection(id) {
@@ -131,21 +182,24 @@
       this.W = W; this.H = H;
       this.svg.attr("viewBox", "0 0 " + W + " " + H).attr("width", W).attr("height", H);
 
+      // Projection décrite par le jeu de données, ajustée pour que son « étendue » tienne à l'écran
       const m = 6;
       const lon0 = this.zone && this.zone.centre ? this.zone.centre : 0;
-      if (this.projectionId === "mercator") {
-        this.proj = d3.geoMercator().rotate([-lon0, 0]).fitExtent([[m, m], [W - m, H - m]],
-          { type: "MultiPoint", coordinates: [[lon0 - 179.9, -57], [lon0 + 179.9, 83]] });
-      } else {
-        this.proj = d3.geoEqualEarth().rotate([-lon0, 0]).fitExtent([[m, m], [W - m, H - m]], { type: "Sphere" });
-      }
+      const def = this.jeu.projections.find((p) => p.id === this.projectionId) || this.jeu.projections[0];
+      this.etendue = def.etendue ? def.etendue(lon0) : {
+        type: "FeatureCollection",
+        features: [...this.formes.values()].filter((f) => f.feature).map((f) => f.feature)
+      };
+      this.proj = def.creer(lon0).fitExtent([[m, m], [W - m, H - m]], this.etendue);
       const path = d3.geoPath(this.proj);
       this.chemin = path;
 
+      // Mer : le globe entier s'il tient à l'écran (monde), sinon tout le fond
+      this.fondMer.attr("width", W).attr("height", H).style("display", this.etendue.type === "Sphere" ? "none" : null);
       const g = this.g;
       g.selectAll("*").remove();
-      g.append("path").datum({ type: "Sphere" }).attr("class", "ocean").attr("d", path);
-      g.append("path").datum(d3.geoGraticule10()).attr("class", "graticule").attr("d", path);
+      if (this.etendue.type === "Sphere") g.append("path").datum({ type: "Sphere" }).attr("class", "ocean").attr("d", path);
+      if (this.jeu.graticule !== false) g.append("path").datum(d3.geoGraticule10()).attr("class", "graticule").attr("d", path);
 
       const zone = this.zone && this.zone.cadre ? this.zone : null;
       const gTerr = g.append("g");
@@ -156,6 +210,7 @@
       }
 
       const gHors = g.append("g");
+      const gEncarts = g.append("g");
       const gPays = g.append("g");
       const gPast = g.append("g");
       this.pastilles = [];
@@ -163,6 +218,13 @@
         f.noeud = null; f.pastille = null;
         f.taille = f.feature ? Math.sqrt(path.area(f.feature)) : 0;
         const horsZone = zone && !zone.contient(f.el);
+        if (f.encart && f.feature) {
+          // Cadre autour d'un encart, pour montrer qu'il n'est pas à sa vraie place
+          const [[x0, y0], [x1, y1]] = path.bounds(f.feature);
+          const marge = 6;
+          gEncarts.append("rect").attr("class", "cadre-encart" + (horsZone ? " hors-zone" : ""))
+            .attr("x", x0 - marge).attr("y", y0 - marge).attr("width", x1 - x0 + 2 * marge).attr("height", y1 - y0 + 2 * marge);
+        }
         if (f.feature) {
           f.noeud = (horsZone ? gHors : gPays).append("path").attr("class", horsZone ? "element hors-zone" : "element")
             .attr("data-id", horsZone ? null : id).attr("d", path(f.feature)).node();
@@ -202,9 +264,12 @@
     // remplit la hauteur et se parcourt en glissant, sinon elle serait minuscule.
     // Avec une région : la région remplit l'écran.
     vueInitiale() {
-      const b = this.chemin.bounds({ type: "Sphere" });
+      if (!this.chemin) return d3.zoomIdentity; // carte pas encore dessinée (page pas encore affichée)
+      const b = this.chemin.bounds(this.etendue);
       const hCarte = b[1][1] - b[0][1];
-      const enHauteur = isFinite(hCarte) && hCarte < this.H * 0.7;
+      // Seulement pour une carte très allongée (le monde) : la France, presque carrée, reste entière
+      const allongee = (b[1][0] - b[0][0]) / hCarte > 1.6;
+      const enHauteur = allongee && isFinite(hCarte) && hCarte < this.H * 0.7;
       const kRemplir = enHauteur ? Math.min(5, this.H / hCarte) : 1;
       const yCentre = (b[0][1] + b[1][1]) / 2;
 
@@ -213,8 +278,9 @@
         // Bords du cadre échantillonnés (les méridiens et parallèles sont courbes en Equal Earth)
         const pts = [];
         const [[o, s], [e, n]] = cadre;
-        for (let lon = o; lon <= e; lon += 5) pts.push(this.proj([lon, s]), this.proj([lon, n]));
-        for (let lat = s; lat <= n; lat += 5) pts.push(this.proj([o, lat]), this.proj([e, lat]));
+        const pasLon = Math.max((e - o) / 10, 0.01), pasLat = Math.max((n - s) / 10, 0.01);
+        for (let lon = o; lon <= e + 1e-9; lon += pasLon) pts.push(this.proj([lon, s]), this.proj([lon, n]));
+        for (let lat = s; lat <= n + 1e-9; lat += pasLat) pts.push(this.proj([o, lat]), this.proj([e, lat]));
         const xs = pts.filter(Boolean).map((p) => p[0]), ys = pts.filter(Boolean).map((p) => p[1]);
         const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
         this.cadrePx = [[x0, y0], [x1, y1]];
@@ -334,7 +400,7 @@
     }
 
     zoomVers(lonlat, k) {
-      if (!this.proj(lonlat)) return;
+      if (!this.proj || !this.proj(lonlat)) return;
       this.visee = { lonlat: lonlat, k: k };
       this.svg.transition().duration(700).call(this.zoom.transform, this.transformVers(lonlat, k));
     }
@@ -342,7 +408,7 @@
     // Cadre un élément ; kMax limite le grossissement pour garder des repères autour.
     zoomSur(id, kMax) {
       const f = this.formes.get(id);
-      if (!f) return;
+      if (!f || !this.chemin) return;
       kMax = kMax || 30;
       if (!f.feature) return this.zoomVers(f.pt, kMax);
       const b = this.chemin.bounds(f.feature);
@@ -355,7 +421,7 @@
     // On cadre sa plus grande partie (la métropole pour la France, pas la Guyane).
     cadrer(id) {
       const f = this.formes.get(id);
-      if (!f) return;
+      if (!f || !this.chemin) return;
       const kMin = this.tInitial ? this.tInitial.k : 1;
       if (!f.feature) return this.zoomVers(f.pt, Math.max(kMin, ZOOM_CADRAGE));
       let principal = null, aireMax = -1;
@@ -388,7 +454,7 @@
     // Distance approximative (km) entre un point et le bord le plus proche de l'élément (0 si dedans).
     distanceKm(id, lonlat) {
       const f = this.formes.get(id);
-      if (!f || !lonlat) return null;
+      if (!f || !lonlat || f.encart) return null; // un encart n'est pas à sa vraie place : pas de distance
       if (!f.feature) return d3.geoDistance(lonlat, f.pt) * RAYON_TERRE_KM;
       if (d3.geoContains(f.feature, lonlat)) return 0;
       let min = Infinity;

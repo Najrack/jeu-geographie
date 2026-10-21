@@ -54,7 +54,9 @@
       try { localStorage.setItem(CLE, JSON.stringify(this.tout)); } catch (e) { /* stockage plein ou refusé */ }
     }
 
+    // competence peut être une liste (mode qui en fait travailler plusieurs) : c'est la plus faible qui compte
     poids(competence, id) {
+      if (Array.isArray(competence)) return Math.max(...competence.map((c) => this.poids(c, id)));
       const f = this.fiches(competence)[id];
       if (!f) return POIDS_NOUVEAU;
       const enRetard = aujourdhui() - f.d >= DELAI_JOURS[f.b];
