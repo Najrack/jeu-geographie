@@ -54,6 +54,14 @@ Sur iPhone, le jeu installé a sa propre mémoire, séparée de Safari. Pour y r
 - **Répétition espacée** : le jeu retient, pour chaque pays, s'il a été réussi ou raté (séparément pour la carte et pour les capitales). Les pays ratés reviennent beaucoup plus souvent, ceux qui sont sus de moins en moins. Cette mémoire reste dans le navigateur de l'appareil ; rien n'est envoyé.
 - **Mon bilan** : une carte de maîtrise où chaque pays est coloré selon ce que vous savez (bleu = su, jaune = hésitant, vermillon hachuré = à revoir, beige = jamais demandé), séparément pour la carte et pour les capitales. En touchant un pays, on voit combien de fois il a été réussi. Un tableau donne le nombre de pays sus, hésitants et à revoir par continent.
 - Un toucher qui suit de près un déplacement ou un zoom de la carte est ignoré, pour éviter les réponses involontaires.
+- **Confort** :
+  - après chaque affichage, les touchers sont ignorés un court instant : un double toucher ne répond pas à la question suivante et ne fait pas sauter la correction ;
+  - quitter une partie commencée avec ⌂ demande une confirmation ;
+  - toucher la mer ou un pays estompé affiche « Touchez un pays de la région en couleur » ;
+  - messages variés et encourageants (« Presque ! » quand l'erreur est à moins de 300 km, « 3 de suite ! ») ;
+  - en fin de partie : la liste des ratés avec leur réponse, et « Revoir ces N maintenant » pour les rejouer tout de suite ;
+  - téléphone tenu en largeur : la carte à gauche, le panneau à droite ;
+  - si le téléphone demande de réduire les animations, les zooms se font sans animation.
 
 ## Mettre en ligne et partager
 

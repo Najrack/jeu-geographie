@@ -3,7 +3,7 @@
 // IMPORTANT : à chaque mise en ligne d'une nouvelle version, augmenter VERSION.
 // Les appareils voient alors que ce fichier a changé, téléchargent la nouvelle version
 // et l'utilisent à la prochaine ouverture du jeu.
-const VERSION = "planisphere-v7";
+const VERSION = "planisphere-v9";
 
 const FICHIERS = [
   "./",

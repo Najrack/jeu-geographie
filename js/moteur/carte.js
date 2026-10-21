@@ -10,6 +10,12 @@
   const DELAI_APRES_GESTE = 350; // ms pendant lesquelles un clic après un déplacement est ignoré
   const RAYON_TERRE_KM = 6371;
 
+  // Personnes sensibles aux mouvements (réglage « réduire les animations » du téléphone) : zooms sans animation
+  const MOUVEMENT_REDUIT = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function duree(ms) {
+    return MOUVEMENT_REDUIT ? 0 : ms;
+  }
+
   // Réunit les formes GeoJSON d'un élément en un seul MultiPolygon.
   // d3 attend les contours extérieurs dans le sens des aiguilles d'une montre : on retourne ceux qui
   // sont dans l'autre sens (sinon le polygone couvrirait toute la Terre sauf le département).
@@ -50,6 +56,7 @@
       this.pastilles = [];
       this.auClic = function () {};      // remplacé par le jeu : function (clic) {...}
       this.auZoomAuto = function () {};  // prévenu quand un clic sur un groupe de pastilles zoome
+      this.auMessage = function () {};   // affiche un court message au joueur (remplacé par l'application)
 
       this.preparerFormes();
 
@@ -93,6 +100,10 @@
         }, 60);
       });
       this.observateur.observe(conteneur);
+    }
+
+    signaler(texte) {
+      this.auMessage(texte);
     }
 
     // Retire la carte de la page (pour passer à un autre jeu de données)
@@ -386,12 +397,12 @@
 
     zoomer(facteur) {
       this.visee = null;
-      this.svg.transition().duration(300).call(this.zoom.scaleBy, facteur);
+      this.svg.transition().duration(duree(300)).call(this.zoom.scaleBy, facteur);
     }
 
     reinitialiserZoom() {
       this.visee = null;
-      this.svg.transition().duration(500).call(this.zoom.transform, this.vueInitiale());
+      this.svg.transition().duration(duree(500)).call(this.zoom.transform, this.vueInitiale());
     }
 
     // Revient à la vue de départ si c'est le jeu qui avait zoomé (pas si le joueur a zoomé lui-même)
@@ -402,7 +413,7 @@
     zoomVers(lonlat, k) {
       if (!this.proj || !this.proj(lonlat)) return;
       this.visee = { lonlat: lonlat, k: k };
-      this.svg.transition().duration(700).call(this.zoom.transform, this.transformVers(lonlat, k));
+      this.svg.transition().duration(duree(700)).call(this.zoom.transform, this.transformVers(lonlat, k));
     }
 
     // Cadre un élément ; kMax limite le grossissement pour garder des repères autour.

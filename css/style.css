@@ -139,6 +139,9 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   max-height: 45vh;
   overflow-y: auto;
 }
+.panneau-pause > * { pointer-events: none; } /* court instant après un affichage : contre les doubles touchers */
+.verdict .serie { font-size: .85rem; font-weight: 600; color: var(--texte-doux); margin-left: .4rem; }
+.retour .verdict-neutre { color: var(--primaire); }
 .panneau.panneau-grand { max-height: 64vh; max-height: 64dvh; }
 @media (min-width: 900px) { .panneau.panneau-grand { max-height: 50vh; max-height: 50dvh; } }
 .panneau p { margin: .25rem 0; }
@@ -236,6 +239,9 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 .zone-code .bouton { margin-top: .3rem; }
 .zone-code summary { min-height: 44px; display: flex; align-items: center; color: var(--primaire); cursor: pointer; }
 
+.liste-rates { margin: .2rem 0 .4rem; padding-left: 1.2rem; }
+.liste-rates li { margin: .15rem 0; }
+
 /* Bilan */
 .legende { list-style: none; padding: 0; margin: .6rem 0; display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-size: .95rem; }
 .legende li { display: flex; align-items: center; gap: .35rem; }
@@ -259,6 +265,18 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 }
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
 .rangee-boutons .bouton { flex: 1 1 12rem; }
+
+/* Téléphone tenu en largeur (paysage) : la carte à gauche, le panneau à droite, au lieu d'empiler les deux */
+@media (orientation: landscape) and (max-height: 520px) {
+  #app { display: grid; grid-template-columns: 1fr minmax(290px, 42%); grid-template-rows: auto minmax(0, 1fr); }
+  .barre { grid-column: 1 / -1; }
+  #zone-carte { grid-column: 1; grid-row: 2; }
+  .panneau, .panneau.panneau-grand {
+    grid-column: 2; grid-row: 2; max-height: none; min-height: 0;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, .1);
+  }
+  .barre { padding-top: .25rem; padding-bottom: .25rem; }
+}
 
 @media (max-width: 420px) {
   :root { font-size: 17px; }

@@ -26,6 +26,7 @@
       carte = new GeoJeu.Carte(zoneCarte, jeu);
       window.carte = carte; // pratique pour tester depuis la console du navigateur
       carte.auZoomAuto = () => montrerBulle("Plusieurs petits " + pluriel + " ici : zoom avant. Touchez à nouveau.");
+      carte.auMessage = montrerBulle;
       construireChoixProjection();
       if (joueur) {
         progression = new GeoJeu.Progression(joueur, jeu.id);
@@ -69,7 +70,12 @@
     else carte.reinitialiserZoom();
   });
 
-  document.getElementById("btn-accueil").addEventListener("click", () => accueil());
+  // ⌂ : retour à l'accueil, avec confirmation si une partie est en cours (un toucher par erreur arrive vite)
+  document.getElementById("btn-accueil").addEventListener("click", () => {
+    if (partieEnCours && partieEnCours.resultats.length &&
+        !window.confirm("Quitter la partie en cours ? Les réponses déjà données restent enregistrées.")) return;
+    accueil();
+  });
 
   let minuterieBulle = null;
   function montrerBulle(texte) {
@@ -244,6 +250,7 @@
 
   // ---------- Accueil ----------
   function accueil() {
+    partieEnCours = null;
     if (!joueur) return demarrer();
     carteAuRepos();
     // Espace insécable avant « ? » pour qu'il ne se retrouve pas seul à la ligne
@@ -478,7 +485,10 @@
     carte.effacerMarques();
     carte.auClic = function () {};
 
-    function afficher() {
+    // boutonTouche : sélecteur du bouton qui vient d'être touché. L'écran est alors redessiné
+    // sans remonter en haut, et ce bouton garde le focus (utile au clavier).
+    function afficher(boutonTouche) {
+      const defilement = panneau.scrollTop;
       carte.definirZone(zoneDe(reglages.region)); // on montre tout de suite la région choisie
       const nv = niveauActuel();
       ecran('<p class="titre-ecran">' + esc(mode.nom(jeu)) + "</p>" +
@@ -496,24 +506,29 @@
         '<button class="bouton bouton-principal" data-action="commencer"' +
         (idMode === "alaCarte" && !aTrouverAlaCarte().length ? " disabled" : "") + ">Commencer</button>" +
         '<button class="bouton" data-action="retour">Retour</button></div>', true);
+      if (boutonTouche) {
+        panneau.scrollTop = defilement;
+        const b = panneau.querySelector(boutonTouche);
+        if (b) b.focus({ preventScroll: true });
+      }
 
       panneau.querySelectorAll("[data-region]").forEach((b) => b.addEventListener("click", () => {
         reglages.region = b.getAttribute("data-region");
-        afficher();
+        afficher('[data-region="' + reglages.region + '"]');
       }));
       panneau.querySelectorAll("[data-niveau]").forEach((b) => b.addEventListener("click", () => {
         reglages.niveau = b.getAttribute("data-niveau");
-        afficher();
+        afficher('[data-niveau="' + reglages.niveau + '"]');
       }));
       panneau.querySelectorAll("[data-donne]").forEach((b) => b.addEventListener("click", () => {
         reglages.alaCarte.donne = b.getAttribute("data-donne");
-        afficher();
+        afficher('[data-donne="' + reglages.alaCarte.donne + '"]');
       }));
       panneau.querySelectorAll("[data-trouver]").forEach((b) => b.addEventListener("click", () => {
         const info = b.getAttribute("data-trouver");
         const t = reglages.alaCarte.trouver;
         reglages.alaCarte.trouver = t.includes(info) ? t.filter((x) => x !== info) : t.concat(info);
-        afficher();
+        afficher('[data-trouver="' + info + '"]');
       }));
       surAction("commencer", () => {
         profils.enregistrerReglages(joueur, jeu.id, reglages);
@@ -525,35 +540,55 @@
   }
 
   // ---------- Partie ----------
-  function jouer(idMode) {
+  let partieEnCours = null; // pour demander confirmation avant de quitter une partie commencée
+
+  // elementsImposes : pour « Revoir les ratés », la partie ne porte que sur ces éléments
+  function jouer(idMode, elementsImposes) {
     const nv = niveauActuel();
     panneau.classList.remove("panneau-grand");
     carte.reinitialiserZoom();
-    const partie = new GeoJeu.Partie({
+    partieEnCours = new GeoJeu.Partie({
       jeu: jeu,
       carte: carte,
       panneau: panneau,
       mode: modeDe(idMode),
-      elements: elementsDeLaPartie(nv),
-      nbQuestions: nv.nb,
+      elements: elementsImposes || elementsDeLaPartie(nv),
+      nbQuestions: elementsImposes ? elementsImposes.length : nv.nb,
       strict: !!nv.strict,
       progression: progression,
       quandFini: (p) => {
-        const rates = p.resultats.filter((r) => !r.juste).length;
-        ecran('<p class="verdict">Résultat : ' + p.score + " / " + p.questions.length + "</p>" +
-          "<p>" + (rates === 0 ? "Parfait ! Ces " + esc(pluriel) + " reviendront moins souvent."
-            : rates === 1 ? "Celui que vous avez raté reviendra plus souvent dans les prochaines parties."
-            : "Les " + rates + " que vous avez ratés reviendront plus souvent dans les prochaines parties.") + "</p>" +
-          '<div class="rangee-boutons">' +
-          '<button class="bouton bouton-principal" data-action="rejouer">Rejouer</button>' +
-          '<button class="bouton" data-action="reglages">Changer de région ou de niveau</button>' +
-          '<button class="bouton" data-action="accueil">Accueil</button></div>');
-        surAction("rejouer", () => jouer(idMode));
-        surAction("reglages", () => preparer(idMode));
-        surAction("accueil", () => accueil());
+        partieEnCours = null;
+        finDePartie(idMode, p);
       }
     });
-    partie.demarrer();
+    partieEnCours.demarrer();
+  }
+
+  // Résultat : un mot d'encouragement, la liste des ratés avec la bonne réponse, et de quoi les revoir tout de suite
+  function finDePartie(idMode, p) {
+    const total = p.questions.length;
+    const rates = p.resultats.filter((r) => !r.juste).map((r) => jeu.elements.find((e) => e.id === r.id));
+    const part = p.score / total;
+    const mot = part === 1 ? "Parfait, aucune erreur !" : part >= 0.8 ? "Très bien !" : part >= 0.5 ? "Pas mal, continuez comme ça !"
+      : "Chaque partie vous fait progresser.";
+    const detail = (el) => "<li><strong>" + esc(el.nom) + "</strong>" + (el.num ? " (" + esc(el.num) + ")" : "") +
+      (el.cap && el.cap.length ? " · " + esc(el.cap.map((c) => c[0]).join(", ")) : "") + "</li>";
+    ecran('<p class="verdict">Résultat : ' + p.score + " / " + total + "</p>" +
+      "<p>" + mot + "</p>" +
+      (rates.length
+        ? '<p class="etiquette">À revoir</p><ul class="liste-rates">' + rates.map(detail).join("") + "</ul>" +
+          '<p class="statut">Ils reviendront plus souvent dans les prochaines parties.</p>'
+        : '<p class="statut">Ces ' + esc(pluriel) + " reviendront moins souvent.</p>") +
+      '<div class="rangee-boutons barre-actions">' +
+      (rates.length ? '<button class="bouton bouton-principal" data-action="revoir">Revoir ' +
+        (rates.length === 1 ? "celui-ci" : "ces " + rates.length) + " maintenant</button>" : "") +
+      '<button class="bouton' + (rates.length ? "" : " bouton-principal") + '" data-action="rejouer">Nouvelle partie</button>' +
+      '<button class="bouton" data-action="reglages">Changer de région ou de niveau</button>' +
+      '<button class="bouton" data-action="accueil">Accueil</button></div>', true);
+    surAction("revoir", () => jouer(idMode, rates));
+    surAction("rejouer", () => jouer(idMode));
+    surAction("reglages", () => preparer(idMode));
+    surAction("accueil", () => accueil());
   }
 
   // ---------- Bilan : carte de maîtrise et statistiques par continent ----------

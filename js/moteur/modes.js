@@ -23,6 +23,21 @@
     return "à environ " + (Math.round(km / pas) * pas).toLocaleString("fr-FR") + " km";
   }
 
+  const PAUSE_APRES_AFFICHAGE = 450; // ms
+
+  // Verdicts : variés et encourageants, avec le nombre de bonnes réponses de suite à partir de 3
+  const BRAVOS = ["Bravo !", "Exact !", "Bien joué !", "Parfait !", "Très bien !"];
+  function verdictJuste(partie) {
+    const n = (partie.serie || 0) + 1;
+    return '<p class="verdict">✓ ' + BRAVOS[Math.floor(Math.random() * BRAVOS.length)] +
+      (n >= 3 ? ' <span class="serie">' + n + " de suite !</span>" : "") + "</p>";
+  }
+  // km : distance de l'erreur sur la carte (null si sans objet) ; passe : le joueur a choisi « Je ne sais pas »
+  function verdictFaux(km, passe) {
+    if (passe) return '<p class="verdict verdict-neutre">ⓘ Voici la réponse</p>';
+    return '<p class="verdict">✗ ' + (km != null && km < 300 ? "Presque !" : "Pas tout à fait") + "</p>";
+  }
+
   // « , à environ 350 km de votre choix », ou rien si la distance n'a pas de sens (encart d'outre-mer)
   function avecDistance(km, suite) {
     return km == null ? "" : ", " + texteDistance(km) + suite;
@@ -62,8 +77,13 @@
         '</span><span>Score : ' + this.score + "</span></div>";
     }
 
+    // Chaque nouvel affichage ignore les touchers pendant un court instant : un double toucher
+    // ne doit pas répondre à la question suivante, ni faire passer la correction sans la voir.
     afficher(html) {
       this.panneau.innerHTML = this.entete() + html;
+      this.panneau.classList.add("panneau-pause");
+      clearTimeout(this.minuteriePause);
+      this.minuteriePause = setTimeout(() => this.panneau.classList.remove("panneau-pause"), PAUSE_APRES_AFFICHAGE);
     }
 
     // Appelé par le mode une fois la réponse jugée.
@@ -72,6 +92,7 @@
       if (!this.enAttente) return;
       this.enAttente = false;
       if (juste) this.score++;
+      this.serie = juste ? (this.serie || 0) + 1 : 0;
       const id = this.questions[this.index].id;
       this.resultats.push({ id: id, juste: juste });
       if (this.progression) {
@@ -83,7 +104,8 @@
         (this.index + 1 < this.questions.length ? "Question suivante" : "Voir le résultat") + "</button>");
       const bouton = this.panneau.querySelector('[data-action="suivante"]');
       bouton.addEventListener("click", () => this.suivante());
-      bouton.focus({ preventScroll: true });
+      // Focus un peu plus tard : une touche Entrée maintenue ne doit pas sauter la correction
+      setTimeout(() => { if (bouton.isConnected) bouton.focus({ preventScroll: true }); }, PAUSE_APRES_AFFICHAGE);
     }
 
     terminer() {
@@ -92,6 +114,12 @@
       this.carte.reinitialiserZoom();
       if (this.quandFini) this.quandFini(this);
     }
+  }
+
+  // Toucher la mer, un territoire non jouable ou un élément hors de la région : on explique quoi faire
+  function indiquerOuToucher(partie) {
+    const lib = partie.jeu.libelles;
+    partie.carte.signaler("Touchez " + lib.unElement + (partie.carte.zone ? " de la région en couleur." : "."));
   }
 
   // Réponse en touchant la carte, en deux temps pour éviter les réponses involontaires :
@@ -115,6 +143,7 @@
     carte.auClic = (clic) => {
       if (choix && clic.id === choix.id) return confirmer();
       if (choix) carte.marquer(choix.id, null);
+      if (!clic.id) indiquerOuToucher(partie);
       choix = clic.id ? clic : null; // toucher la mer ou un territoire non jouable annule la sélection
       if (choix) carte.marquer(choix.id, "choisi");
       bouton.disabled = !choix;
@@ -139,11 +168,12 @@
       carte.marquer(el.id, "juste");
       let html;
       if (clic.id === el.id) {
-        html = '<p class="verdict">✓ Bravo !</p><p><strong>' + esc(el.nom) + "</strong> est bien ici.</p>";
+        html = verdictJuste(partie) + "<p><strong>" + esc(el.nom) + "</strong> est bien ici.</p>";
       } else {
         carte.marquer(clic.id, "faux");
-        html = '<p class="verdict">✗ Raté</p><p>Vous avez choisi : <strong>' + esc(clic.element.nom) + "</strong>.</p>" +
-          "<p><strong>" + esc(el.nom) + "</strong> est en bleu" + avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>";
+        const km = carte.distanceKm(el.id, clic.lonlat);
+        html = verdictFaux(km) + "<p>Vous avez choisi : <strong>" + esc(clic.element.nom) + "</strong>.</p>" +
+          "<p><strong>" + esc(el.nom) + "</strong> est en bleu" + avecDistance(km, " de votre choix") + ".</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
       }
       if (el.statut) html += '<p class="statut">ⓘ Statut particulier : ' + esc(el.statut) + "</p>";
@@ -199,10 +229,10 @@
       carte.marquer(el.id, "juste");
       let html;
       if (juste) {
-        html = '<p class="verdict">✓ Bravo !</p><p>C\'est bien <strong>' + esc(el.nom) + "</strong>." +
+        html = verdictJuste(partie) + "<p>C'est bien <strong>" + esc(el.nom) + "</strong>." +
           (trouve.exact ? "" : " (On l'écrit ainsi.)") + "</p>";
       } else {
-        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>" +
+        html = verdictFaux(null, texte == null) +
           "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu).</p>";
         if (trouve) {
           carte.marquer(trouve.id, "faux");
@@ -264,10 +294,10 @@
       carte.marquer(el.id, "juste");
       let html;
       if (juste) {
-        html = '<p class="verdict">✓ Bravo !</p>' +
+        html = verdictJuste(partie) +
           (trouve.exact ? "" : "<p>On écrit <strong>" + esc(trouve.nom) + "</strong>.</p>");
       } else {
-        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>";
+        html = verdictFaux(null, texte == null);
         if (trouve) {
           const autre = jeu.elements.find((e) => e.id === trouve.id);
           carte.marquer(autre.id, "faux");
@@ -307,12 +337,12 @@
       carte.marquer(el.id, "juste");
       let html;
       if (juste) {
-        html = '<p class="verdict">✓ Bravo !</p>';
+        html = verdictJuste(partie);
       } else {
         carte.marquer(clic.id, "faux");
-        html = '<p class="verdict">✗ Raté</p>' +
-          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu)" +
-          avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>" +
+        const km = carte.distanceKm(el.id, clic.lonlat);
+        html = verdictFaux(km) +
+          "<p>C'était <strong>" + esc(el.nom) + "</strong> (en bleu)" + avecDistance(km, " de votre choix") + ".</p>" +
           '<p class="statut">Vous avez choisi : ' + esc(clic.element.nom) + " (" + esc(jeu.libelles.capitale) + " : " +
           esc(clic.element.cap.map((c) => c[0]).join(", ")) + ").</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
@@ -352,9 +382,9 @@
       partie.carte.marquer(el.id, "juste");
       let html;
       if (juste) {
-        html = '<p class="verdict">✓ Bravo !</p><p><strong>' + esc(el.nom) + "</strong> : " + esc(el.num) + "</p>";
+        html = verdictJuste(partie) + "<p><strong>" + esc(el.nom) + "</strong> : " + esc(el.num) + "</p>";
       } else {
-        html = '<p class="verdict">✗ ' + (texte == null ? "Dommage" : "Raté") + "</p>" +
+        html = verdictFaux(null, texte == null) +
           "<p><strong>" + esc(el.nom) + "</strong> : c'était le <strong>" + esc(el.num) + "</strong>.</p>";
         if (trouve) {
           partie.carte.marquer(trouve.id, "faux");
@@ -388,12 +418,12 @@
       carte.marquer(el.id, "juste");
       let html;
       if (juste) {
-        html = '<p class="verdict">✓ Bravo !</p><p>' + esc(el.num) + " : <strong>" + esc(el.nom) + "</strong></p>";
+        html = verdictJuste(partie) + "<p>" + esc(el.num) + " : <strong>" + esc(el.nom) + "</strong></p>";
       } else {
         carte.marquer(clic.id, "faux");
-        html = '<p class="verdict">✗ Raté</p>' +
-          "<p>" + esc(el.num) + " : c'était <strong>" + esc(el.nom) + "</strong> (en bleu)" +
-          avecDistance(carte.distanceKm(el.id, clic.lonlat), " de votre choix") + ".</p>" +
+        const km = carte.distanceKm(el.id, clic.lonlat);
+        html = verdictFaux(km) +
+          "<p>" + esc(el.num) + " : c'était <strong>" + esc(el.nom) + "</strong> (en bleu)" + avecDistance(km, " de votre choix") + ".</p>" +
           '<p class="statut">Vous avez choisi : ' + esc(clic.element.nom) + " (" + esc(clic.element.num) + ").</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
       }
@@ -481,6 +511,7 @@
         // Un toucher sélectionne (en orange) ; un autre toucher change de choix
         carte.auClic = (clic) => {
           if (choix) carte.marquer(choix.id, null);
+          if (!clic.id) indiquerOuToucher(partie);
           choix = clic.id ? clic : null;
           if (choix) carte.marquer(choix.id, "choisi");
           form.querySelector("[data-etape-carte]").classList.toggle("fait", !!choix);
@@ -574,8 +605,10 @@
 
       const notes = Object.values(resultats);
       const juste = notes.every(Boolean);
-      const verdict = juste ? "✓ Bravo !" : notes.some(Boolean) ? "◐ En partie" : "✗ Raté";
-      let html = '<p class="verdict">' + verdict + "</p><p><strong>" + esc(el.nom) + "</strong>" +
+      const verdict = juste ? verdictJuste(partie)
+        : !reponse ? verdictFaux(null, true)
+        : notes.some(Boolean) ? '<p class="verdict">◐ En partie</p>' : verdictFaux(null);
+      let html = verdict + "<p><strong>" + esc(el.nom) + "</strong>" +
         (el.num ? " (" + esc(el.num) + ")" : "") + "</p>" +
         '<ul class="detail-trio">' + lignes.join("") + "</ul>";
       if (el.capNote && (donne === "capitale" || aTrouver.includes("capitale"))) html += '<p class="statut">' + esc(el.capNote) + "</p>";
