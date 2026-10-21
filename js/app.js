@@ -4,6 +4,8 @@
   const esc = GeoJeu.outils.esc;
   const profils = GeoJeu.profils;
   const jeu = GeoJeu.jeux.monde;
+  // Adresse en ligne du jeu, pour fabriquer les liens de sauvegarde quand la page est ouverte depuis un fichier
+  const ADRESSE_PUBLIQUE = "https://najrack.github.io/jeu-geographie/";
   const lib = jeu.libelles;
   const pluriel = lib.lesElements.replace(/^les /, ""); // « pays »
   const majuscule = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -57,6 +59,17 @@
     const b = panneau.querySelector('[data-action="' + action + '"]');
     if (b) b.addEventListener("click", fonction);
   }
+  // Adresse du jeu à mettre dans les liens partagés
+  function adresseDuJeu() {
+    return location.protocol.startsWith("http") ? location.origin + location.pathname : ADRESSE_PUBLIQUE;
+  }
+
+  // Copie un texte ; renvoie une promesse vraie si c'est fait, fausse si le navigateur refuse
+  function copierTexte(texte) {
+    if (!navigator.clipboard) return Promise.resolve(false);
+    return navigator.clipboard.writeText(texte).then(() => true, () => false);
+  }
+
   function carteAuRepos() {
     carte.effacerMarques();
     carte.auClic = function () {};
@@ -78,9 +91,30 @@
 
   function demarrer() {
     const nom = profils.actif();
+    if (nom) chargerJoueur(nom);
+    const lien = lireLienImport();
+    if (lien && lien.erreur) return erreurLien(lien.erreur);
+    if (lien) return confirmerImport(lien.donnees);
     if (!profils.noms().length) bienvenue();
-    else if (nom) { chargerJoueur(nom); accueil(); }
+    else if (nom) accueil();
     else quiJoue();
+  }
+
+  // Page ouverte depuis un lien de sauvegarde (…/#importer=GEO1-…) ? La partie après # reste sur l'appareil.
+  function lireLienImport() {
+    const m = location.hash.match(/^#importer=(.+)$/);
+    if (!m) return null;
+    history.replaceState(null, "", location.pathname + location.search); // pour ne pas réimporter en rechargeant
+    try { return { donnees: profils.lireCode(decodeURIComponent(m[1])) }; } catch (e) { return { erreur: e.message }; }
+  }
+
+  function erreurLien(message) {
+    carteAuRepos();
+    ecran('<p class="titre-ecran">Lien de sauvegarde illisible</p>' +
+      "<p>" + esc(message) + "</p>" +
+      "<p>Le lien a peut-être été coupé en route. Demandez-le à nouveau, ou utilisez plutôt le code (« Changer d'appareil »).</p>" +
+      '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="continuer">Continuer</button></div>');
+    surAction("continuer", demarrer);
   }
 
   // ---------- Aide ----------
@@ -97,6 +131,14 @@
   function aide() {
     carteAuRepos();
     ecran('<p class="titre-ecran">Comment jouer</p>' + AIDE +
+      '<p class="titre-ecran">Mettre le jeu sur l\'écran d\'accueil</p>' +
+      '<ul class="aide">' +
+      "<li><strong>iPhone, iPad</strong> (Safari) : bouton Partager (carré avec une flèche vers le haut), puis « Sur l'écran d'accueil ».</li>" +
+      "<li><strong>Android</strong> (Chrome) : menu ⋮ en haut à droite, puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».</li>" +
+      "<li>Une fois installé, le jeu s'ouvre comme une application et marche aussi <strong>sans internet</strong>.</li>" +
+      "<li>Sur iPhone, le jeu installé a sa propre mémoire, séparée de Safari : pour y retrouver une progression, " +
+      "utilisez « Changer d'appareil » → « Copier le code » dans Safari, puis collez le code dans le jeu installé.</li>" +
+      "</ul>" +
       '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="retour">J\'ai compris</button></div>', true);
     surAction("retour", () => accueil());
   }
@@ -179,7 +221,10 @@
       '<button class="bouton-lien" data-action="bilan">Mon bilan</button>' +
       '<button class="bouton-lien" data-action="explorer">Explorer la carte</button>' +
       '<button class="bouton-lien" data-action="aide">Aide</button>' +
-      '<button class="bouton-lien" data-action="sauvegarde">Changer d\'appareil</button></div>');
+      '<button class="bouton-lien" data-action="sauvegarde">Changer d\'appareil</button>' +
+      (demandeInstallation ? '<button class="bouton-lien" data-action="installer">Installer le jeu</button>' : "") +
+      "</div>", true);
+    surAction("installer", installer);
     for (const mode of ["localiser", "nommer", "capitale", "capitaleVersElement"]) surAction(mode, () => preparer(mode));
     surAction("joueurs", quiJoue);
     surAction("bilan", () => bilan("carte"));
@@ -193,12 +238,17 @@
     carteAuRepos();
     ecran('<p class="titre-ecran">Changer d\'appareil</p>' +
       "<p>Pour retrouver la progression de <strong>" + esc(joueur) + "</strong> sur un autre téléphone ou ordinateur :</p>" +
-      '<ol class="aide"><li>Créez le code ci-dessous et copiez-le.</li>' +
-      "<li>Envoyez-le-vous (message, e-mail…).</li>" +
-      "<li>Sur l'autre appareil, ouvrez le jeu, touchez « Changer d'appareil » et collez le code en bas.</li></ol>" +
-      '<button class="bouton bouton-principal" data-action="creer">Créer mon code</button>' +
-      '<div class="zone-code" hidden><textarea readonly rows="3" aria-label="Code de sauvegarde"></textarea>' +
-      '<button class="bouton" data-action="copier">Copier le code</button><p class="message-info" role="status"></p></div>' +
+      '<ol class="aide"><li>Touchez « Préparer l\'envoi ».</li>' +
+      "<li>« Envoyer » ouvre le partage du téléphone (message, e-mail…). Vous pouvez aussi copier le lien, ou le code.</li>" +
+      "<li>Sur l'autre appareil, touchez le lien reçu : le jeu s'ouvre et propose l'import. " +
+      "Avec le code : « Changer d'appareil », puis collez-le en bas de l'écran.</li></ol>" +
+      '<button class="bouton bouton-principal" data-action="creer">Préparer l\'envoi</button>' +
+      '<div class="zone-code" hidden><div class="rangee-boutons">' +
+      (navigator.share ? '<button class="bouton bouton-principal" data-action="partager">Envoyer…</button>' : "") +
+      '<button class="bouton" data-action="copier-lien">Copier le lien</button>' +
+      '<button class="bouton" data-action="copier-code">Copier le code</button></div>' +
+      '<p class="message-info" role="status"></p>' +
+      '<details><summary>Voir le code</summary><textarea readonly rows="3" aria-label="Code de sauvegarde"></textarea></details></div>' +
       '<p class="etiquette">Récupérer une progression</p>' +
       '<textarea class="code-a-importer" rows="3" placeholder="Collez le code ici" aria-label="Code à importer"></textarea>' +
       '<button class="bouton" data-action="importer">Importer</button>' +
@@ -208,19 +258,36 @@
     const zone = panneau.querySelector(".zone-code");
     const champCode = zone.querySelector("textarea");
     const info = zone.querySelector(".message-info");
+    let code = "", lien = "";
     surAction("creer", () => {
-      champCode.value = profils.exporter(joueur);
+      code = profils.exporter(joueur);
+      lien = adresseDuJeu() + "#importer=" + profils.codePourLien(code);
+      champCode.value = code;
       zone.hidden = false;
       info.textContent = "";
     });
-    surAction("copier", () => {
-      const repli = () => {
+    // Copie dans le presse-papiers ; si le navigateur refuse, on montre le texte sélectionné à copier à la main
+    function copier(texte, quoi) {
+      copierTexte(texte).then((ok) => {
+        if (ok) {
+          info.textContent = "✓ " + majuscule(quoi) + " copié.";
+          return;
+        }
+        champCode.value = texte;
+        champCode.parentNode.open = true;
         champCode.focus();
         champCode.select();
-        info.textContent = "Le code est sélectionné : copiez-le (appui long → Copier).";
-      };
-      if (navigator.clipboard) navigator.clipboard.writeText(champCode.value).then(() => { info.textContent = "✓ Code copié."; }, repli);
-      else repli();
+        info.textContent = "Le " + quoi + " est sélectionné : copiez-le (appui long → Copier).";
+      });
+    }
+    surAction("copier-lien", () => copier(lien, "lien"));
+    surAction("copier-code", () => copier(code, "code"));
+    surAction("partager", () => {
+      navigator.share({
+        title: "Planisphère – progression de " + joueur,
+        text: "Pour retrouver la progression de " + joueur + " dans le jeu de géographie, ouvre ce lien sur l'autre appareil :",
+        url: lien
+      }).catch(() => { /* partage annulé */ });
     });
     surAction("importer", () => {
       const erreur = panneau.querySelector(".message-erreur");
@@ -258,7 +325,7 @@
         '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="accueil">Accueil</button></div>');
       surAction("accueil", () => accueil());
     });
-    surAction("annuler", sauvegarde);
+    surAction("annuler", () => (joueur ? sauvegarde() : demarrer()));
   }
 
   // ---------- Exploration : toucher un pays pour voir sa fiche ----------
@@ -448,6 +515,32 @@
       info.innerHTML = "<strong>" + esc(clic.element.nom) + "</strong> : " + esc(etat.nom) +
         (f ? " (réussi " + f.j + " fois sur " + f.v + ")" : "");
     };
+  }
+
+  // ---------- Hors ligne et installation ----------
+  // Le service worker garde le jeu sur l'appareil (impossible quand la page est ouverte depuis un fichier).
+  // Sur le serveur de test local, il est désactivé pour toujours voir la dernière version, sauf avec ?hors-ligne.
+  const local = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  if ("serviceWorker" in navigator && location.protocol !== "file:" && (!local || location.search.includes("hors-ligne"))) {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* le jeu marche quand même, en ligne */ });
+  }
+
+  // Android et ordinateur : le navigateur propose l'installation, on la garde pour un bouton de l'accueil
+  let demandeInstallation = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    demandeInstallation = e;
+    if (panneau.querySelector(".liens-accueil")) accueil();
+  });
+  window.addEventListener("appinstalled", () => { demandeInstallation = null; });
+
+  function installer() {
+    if (!demandeInstallation) return aide();
+    demandeInstallation.prompt();
+    demandeInstallation.userChoice.finally(() => {
+      demandeInstallation = null;
+      accueil();
+    });
   }
 
   demarrer();

@@ -7,6 +7,7 @@
 | Bibliothèque de dessin | [D3](https://d3js.org/) 7.9.0, Mike Bostock | ISC |
 | Lecture du format TopoJSON | [topojson-client](https://github.com/topojson/topojson-client) 3.1.0, Mike Bostock | ISC |
 | Liste des pays, noms français, capitales, variantes | Rédigée pour ce projet | — |
+| Icônes de l'application (`icones/`) | Dessinées pour ce projet par `outils/creer-icones.ps1` | — |
 
 Le texte complet des licences ISC est dans `outils/source/` (`d3-LICENSE.txt`, `topojson-LICENSE.txt`, `world-atlas-LICENSE.txt`).
 

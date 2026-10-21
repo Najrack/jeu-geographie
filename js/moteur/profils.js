@@ -129,13 +129,20 @@
       return PREFIXE + versBase64(JSON.stringify(donnees));
     },
 
-    // Décode un code collé ; lève une erreur au message compréhensible s'il est abîmé
+    // Version du code utilisable dans un lien (base64 « URL » : - et _ au lieu de + et /, sans =)
+    codePourLien: function (code) {
+      return PREFIXE + code.slice(PREFIXE.length).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    },
+
+    // Décode un code collé (ou venu d'un lien) ; lève une erreur au message compréhensible s'il est abîmé
     lireCode: function (code) {
       const brut = String(code || "").replace(/\s+/g, "");
       if (!brut) throw new Error("Collez d'abord un code.");
       if (!brut.startsWith(PREFIXE)) throw new Error("Ce texte n'est pas un code de sauvegarde du jeu.");
+      let b64 = brut.slice(PREFIXE.length).replace(/-/g, "+").replace(/_/g, "/");
+      while (b64.length % 4) b64 += "=";
       let d;
-      try { d = JSON.parse(depuisBase64(brut.slice(PREFIXE.length))); } catch (e) { d = null; }
+      try { d = JSON.parse(depuisBase64(b64)); } catch (e) { d = null; }
       const abime = new Error("Ce code est incomplet ou abîmé : recopiez-le en entier.");
       if (!d || d.v !== 1 || typeof d.nom !== "string" || typeof d.base !== "number" || !d.progression || typeof d.progression !== "object") throw abime;
       // Retour au format des fiches { b, v, j, d }

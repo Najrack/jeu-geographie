@@ -209,6 +209,7 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   border: 2px solid var(--frontiere); border-radius: var(--rayon); resize: vertical; word-break: break-all;
 }
 .zone-code .bouton { margin-top: .3rem; }
+.zone-code summary { min-height: 44px; display: flex; align-items: center; color: var(--primaire); cursor: pointer; }
 
 /* Bilan */
 .legende { list-style: none; padding: 0; margin: .6rem 0; display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-size: .95rem; }

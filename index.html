@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#1f4e79">
   <title>Planisphère – jeu de géographie</title>
+  <meta name="description" content="Apprendre où sont les pays du monde et leurs capitales.">
+  <!-- Installation sur l'écran d'accueil (Android, ordinateur, iPhone) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icones/icone-192.png">
+  <link rel="apple-touch-icon" href="icones/icone-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Planisphère">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -43,8 +51,7 @@
   <script src="js/moteur/reponses.js"></script>
   <script src="js/moteur/modes.js"></script>
   <script src="js/moteur/progression.js"></script>
-  <script src="js/moteur/profils.js"></script>
-  <!-- Jeu de données : le monde -->
+  <script src="js/moteur/profils.js"></script>  <!-- Jeu de données : le monde -->
   <script src="donnees/monde/config.js"></script>
   <script src="donnees/monde/pays.js"></script>
   <script src="donnees/monde/carte.js"></script>

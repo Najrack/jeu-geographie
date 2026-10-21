@@ -25,8 +25,8 @@
 
   class Partie {
     // options : { jeu, carte, panneau, mode, elements, nbQuestions, progression, strict, quandFini }
-    // strict : orthographe moins tolérante dans les réponses tapées.
-    // Avec une progression, les questions sont tirées par répétition espacée et les réponses y sont notées.
+    //   strict : orthographe moins tolérante dans les réponses tapées.
+    //   Avec une progression, les questions sont tirées par répétition espacée et les réponses y sont notées.
     constructor(options) {
       Object.assign(this, options);
       if (this.mode.filtrer) this.elements = this.mode.filtrer(this.elements);

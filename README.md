@@ -7,13 +7,29 @@ Il fonctionne entièrement dans le navigateur : pas de compte, pas de serveur, e
 
 Double-cliquez sur **`index.html`**. Le jeu s'ouvre dans votre navigateur habituel, même sans connexion internet.
 
-Pour tester ce qui nécessite une vraie adresse web (l'installation sur téléphone et le mode hors ligne, à venir), il y a un petit serveur local :
-clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », puis ouvrez http://localhost:8123.
+Il existe aussi un petit serveur de test local : clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », puis ouvrez http://localhost:8123.
+Sur ce serveur, le mode hors ligne est désactivé pour toujours voir la dernière version ; pour le tester, ouvrez http://localhost:8123/?hors-ligne.
+
+## Installer le jeu sur un téléphone
+
+Ouvrez **https://najrack.github.io/jeu-geographie/**, puis :
+
+- **iPhone, iPad** (Safari) : bouton Partager (carré avec une flèche vers le haut) → « Sur l'écran d'accueil ».
+- **Android** (Chrome) : menu ⋮ → « Installer l'application » ou « Ajouter à l'écran d'accueil ». Sur Android et sur ordinateur, un lien « Installer le jeu » apparaît aussi en bas de l'accueil.
+
+Le jeu s'ouvre alors comme une application, en plein écran, et **fonctionne sans internet** : tous ses fichiers sont gardés sur l'appareil après la première visite.
+
+Sur iPhone, le jeu installé a sa propre mémoire, séparée de Safari. Pour y retrouver une progression commencée dans Safari : dans Safari, « Changer d'appareil » → « Copier le code », puis dans le jeu installé, « Changer d'appareil » → coller le code → « Importer ».
 
 ## Ce qui existe déjà
 
 - **Joueurs** : au premier lancement, un court texte d'aide puis « quel est votre prénom ? ». Chaque prénom a sa propre progression et ses réglages sur l'appareil, sans mot de passe. « Changer de joueur » permet d'en ajouter, d'en choisir un autre ou d'en supprimer (✕). L'aide reste accessible depuis l'accueil.
-- **Changer d'appareil** : « Créer mon code » produit un code de sauvegarde à copier et à s'envoyer (message, e-mail). Sur l'autre appareil, « Changer d'appareil » → coller le code → « Importer ». Si le prénom existe déjà, les deux progressions sont fusionnées (le résultat le plus récent de chaque pays est gardé).
+- **Changer d'appareil** : « Préparer l'envoi » propose trois façons de transmettre sa progression :
+  - **Envoyer…** (sur téléphone) ouvre le menu de partage (SMS, WhatsApp, e-mail…) avec un lien ;
+  - **Copier le lien** : touché sur l'autre appareil, ce lien ouvre le jeu qui propose aussitôt l'import ;
+  - **Copier le code** : à coller sur l'autre appareil dans « Changer d'appareil » → « Importer ».
+
+  La progression est contenue dans le lien après le signe `#` : cette partie n'est jamais transmise au site, elle reste sur l'appareil. Si le prénom existe déjà, les deux progressions sont fusionnées (le résultat le plus récent de chaque pays est gardé). Il n'y a pas de synchronisation automatique : pour mettre à jour l'autre appareil, on renvoie un lien.
 - La carte du monde avec zoom (molette, boutons + / −, deux doigts) et déplacement (glisser).
 - Deux types de carte : « Tailles réelles » (Equal Earth) et « Classique » (Mercator).
 - Des pastilles pour les tout petits pays (Vatican, Monaco, Luxembourg, Maldives…). Quand plusieurs sont collées, toucher l'une d'elles zoome sur la zone.
@@ -44,6 +60,8 @@ Pour le partager, il suffit d'envoyer ce lien (SMS, e-mail, messagerie). Il s'ou
 4. En bas, cliquez sur **Commit changes**.
 5. Attendez 1 à 2 minutes, puis rechargez le jeu.
 
+Comme le jeu garde une copie de lui-même sur chaque appareil (pour marcher hors ligne), la nouvelle version est téléchargée en arrière-plan à l'ouverture suivante et s'affiche à l'ouverture d'après. Pour que les appareils remarquent la mise à jour, le numéro `VERSION` en haut du fichier `sw.js` doit changer à chaque nouvelle version (Claude s'en charge quand il modifie le jeu).
+
 ### Première mise en ligne (déjà faite, pour mémoire)
 
 1. Créer un compte gratuit sur https://github.com/signup.
@@ -53,15 +71,21 @@ Pour le partager, il suffit d'envoyer ce lien (SMS, e-mail, messagerie). Il s'ou
 
 Pourquoi ne pas simplement envoyer le fichier `index.html` ? Sur téléphone, un fichier ouvert depuis l'appareil s'affiche dans un aperçu qui ne fait pas fonctionner le jeu : il faut le lien internet.
 
+### Pourquoi GitHub Pages (et pas Netlify)
+
+Les deux sont gratuits et conviennent. Netlify est plus simple au départ (glisser-déposer un dossier) ; GitHub Pages a été choisi pour la suite : historique de toutes les versions, adresse stable, et mises à jour qui pourront être préparées automatiquement plus tard. Inconvénient : le dépôt est public (le code du jeu est visible, ce qui ne pose pas de problème ici ; aucune donnée de joueur n'y est jamais envoyée).
+
 ## Organisation des fichiers
 
 | Dossier / fichier | Rôle |
 |---|---|
 | `index.html` | La page du jeu |
+| `manifest.webmanifest`, `icones/` | Nom et icône de l'application installée sur l'écran d'accueil |
+| `sw.js` | Copie du jeu sur l'appareil pour le mode hors ligne (`VERSION` à changer à chaque mise à jour) |
 | `css/style.css` | Couleurs et mise en page |
 | `js/lib/` | Bibliothèques D3 et topojson-client (copiées ici, pas de chargement depuis internet) |
 | `js/moteur/` | Le moteur du jeu, indépendant de la carte utilisée |
-| `js/app.js` | Les écrans (accueil, exploration, partie) |
+| `js/app.js` | Les écrans (accueil, joueurs, réglages, partie, bilan, sauvegarde, aide) |
 | `donnees/monde/` | Le jeu de données « monde » : réglages, liste des pays, fond de carte |
-| `outils/` | Fichiers sources et petit serveur de test (pas nécessaires pour jouer) |
+| `outils/` | Fichiers sources, serveur de test et fabrication des icônes (pas nécessaires pour jouer) |
 | `LICENCES.md` | Licences des sources utilisées |

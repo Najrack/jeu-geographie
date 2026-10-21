@@ -26,8 +26,16 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 ## Étapes de la phase 1
 1. Plan ✔ 2. Carte, zoom, projections ✔ 3. Mode « où est ce pays » ✔ (sélection puis validation) 4. Mode saisie du nom ✔ (`js/moteur/reponses.js`)
 5. Capitales dans les deux sens ✔ (choix des cas délicats validés le 21/10/2026 : plusieurs réponses seulement pour les capitales multiples officielles) 6. Pastilles micro-États ✔ 7. Régions + difficulté ✔ (champ `n` des éléments, `regions`/`niveaux` dans config.js) 8. Répétition espacée ✔ (`js/moteur/progression.js`, boîtes de Leitner par compétence « carte »/« capitale » ; l'ancien profil « Moi » est repris par le premier prénom créé)
-9. Bilan + carte de maîtrise ✔ (su = boîte ≥ 3, hésitant = 1-2, à revoir = 0) 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import ✔ (`js/moteur/profils.js` ; niveaux dans config.js ; code « GEO1- » + base64 d'un JSON compact)
-11. Défi du jour (série tirée de la date, résultat à partager en texte) 12. PWA hors ligne + mise en ligne
+9. Bilan + carte de maîtrise ✔ (su = boîte ≥ 3, hésitant = 1-2, à revoir = 0) 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import ✔ (`js/moteur/profils.js` ; niveaux dans config.js ; code « GEO1- » + base64 d'un JSON compact ; aussi en lien `…/#importer=<code base64url>` et bouton de partage)
+
+## Synchronisation (décidé le 21/10/2026)
+Pas de synchronisation en ligne (pas de serveur ni de service tiers) : transfert par lien, partage ou code, avec fusion. Le code ne peut pas être court ni mémorisable puisqu'il contient les données elles-mêmes.
+11. Défi du jour : abandonné à la demande du propriétaire (21/10/2026), ne pas le réintroduire 12. PWA hors ligne + mise en ligne ✔ (`manifest.webmanifest`, `sw.js`, `icones/`)
+
+## Règles pour chaque modification (depuis l'étape 12)
+- Augmenter `VERSION` dans `sw.js` (planisphere-v1, v2…) à chaque changement d'un fichier du jeu, sinon les appareils gardent l'ancienne copie.
+- Tout nouveau fichier nécessaire au jeu doit être ajouté à la liste `FICHIERS` de `sw.js`.
+- Le service worker est désactivé sur localhost (sauf `?hors-ligne`) pour que les tests voient la dernière version.
 
 ## Après chaque étape
 Ouvrir la page, la tester (y compris cliquer sur un petit pays comme le Luxembourg, et à taille téléphone), dire ce qui a été vérifié et ce que le propriétaire doit tester lui-même.
