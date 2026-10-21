@@ -20,13 +20,22 @@ GeoJeu.enregistrer("monde", {
   ],
 
   // Régions proposées au joueur. "tout" = toute la carte.
+  //   cadre  : [[longitude ouest, latitude sud], [longitude est, latitude nord]] montré au début de la partie
+  //   centre : longitude placée au milieu de la carte (pour ne pas couper le Pacifique en deux)
   regions: [
     { id: "tout", nom: "Monde entier" },
-    { id: "europe", nom: "Europe" },
-    { id: "afrique", nom: "Afrique" },
-    { id: "asie", nom: "Asie" },
-    { id: "ameriques", nom: "Amériques" },
-    { id: "oceanie", nom: "Océanie" }
+    { id: "europe", nom: "Europe", cadre: [[-25, 34], [45, 71]] },
+    { id: "afrique", nom: "Afrique", cadre: [[-26, -36], [58, 38]] },
+    { id: "asie", nom: "Asie", cadre: [[25, -11], [150, 70]], centre: 80 },
+    { id: "ameriques", nom: "Amériques", cadre: [[-170, -56], [-30, 72]], centre: -90 },
+    { id: "oceanie", nom: "Océanie", cadre: [[110, -48], [192, 12]], centre: 150 }
+  ],
+
+  // Niveaux de difficulté (champ n des éléments : 1 = très connu, 3 = difficile)
+  niveaux: [
+    { n: 1, nom: "Les plus connus" },
+    { n: 2, nom: "Connus et moyens" },
+    { n: 3, nom: "Tous les pays" }
   ],
 
   // Formes de la carte à ne pas dessiner du tout

@@ -125,6 +125,7 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   max-height: 45vh;
   overflow-y: auto;
 }
+.panneau.panneau-grand { max-height: 64vh; max-height: 64dvh; }
 .panneau p { margin: .25rem 0; }
 .progression { display: flex; justify-content: space-between; color: var(--texte-doux); font-size: .9rem; margin-bottom: .3rem; }
 .consigne { color: var(--texte-doux); }
@@ -161,6 +162,18 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
 .pastille-cible { background: var(--cible); }
 .aide-validation { font-size: .85rem; color: var(--texte-doux); }
 .bouton:focus-visible, .bouton-icone:focus-visible, .interrupteur button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
+.titre-ecran { font-size: 1.2rem; font-weight: 700; color: var(--primaire); }
+.etiquette { font-weight: 600; margin: .6rem 0 .3rem; }
+.choix { display: flex; flex-wrap: wrap; gap: .4rem; }
+.choix button {
+  min-height: 44px; padding: .3rem .9rem;
+  border: 2px solid var(--primaire); border-radius: 999px;
+  background: #fff; color: var(--primaire); font-size: .95rem;
+}
+.choix button[aria-pressed="true"] { background: var(--primaire); color: var(--primaire-texte); font-weight: 700; }
+.choix button[aria-pressed="true"]::before { content: "✓ "; }
+.choix .nombre { font-weight: 400; font-size: .85em; opacity: .85; }
+.choix button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
 .rangee-boutons .bouton { flex: 1 1 12rem; }
 

@@ -6,7 +6,7 @@
   const RAYON_TOUCHER = 15;   // rayon de la zone qu'on peut toucher du doigt (px)
   const ECART_GROUPE = 22;    // deux pastilles plus proches que ça (px) : on zoome au lieu de choisir
   const ZOOM_MAX = 400;
-  const ZOOM_CADRAGE = 4;        // grossissement maximal pour montrer un élément en gardant des repères autour
+  const ZOOM_CADRAGE = 6;       // grossissement maximal pour montrer un élément en gardant des repères autour
   const DELAI_APRES_GESTE = 350; // ms pendant lesquelles un clic après un déplacement est ignoré
   const RAYON_TERRE_KM = 6371;
 
@@ -17,6 +17,7 @@
       this.projectionId = jeu.projections[0].id;
       this.marques = new Map();          // id d'élément -> nom de marque (juste, faux, cible, choisi…)
       this.t = d3.zoomIdentity;
+      this.zone = null;                  // région montrée (voir definirZone)
       this.pastilles = [];
       this.auClic = function () {};      // remplacé par le jeu : function (clic) {...}
       this.auZoomAuto = function () {};  // prévenu quand un clic sur un groupe de pastilles zoome
@@ -35,7 +36,10 @@
       this.zoom = d3.zoom()
         .scaleExtent([1, ZOOM_MAX])
         .clickDistance(4)
-        .on("start", (e) => { this.tDebutGeste = e.transform; })
+        .on("start", (e) => {
+          this.tDebutGeste = e.transform;
+          if (e.sourceEvent) this.visee = null; // le joueur reprend la main sur la carte
+        })
         .on("zoom", (e) => this.surZoom(e.transform))
         .on("end", (e) => {
           // Un vrai déplacement ou zoom de la main : les clics qui suivent de près sont ignorés
@@ -84,6 +88,7 @@
         this.formes.set(el.id, {
           el: el,
           feature: feature,
+          aire: feature ? d3.geoArea(feature) : 0, // surface réelle (sert à classer du plus grand au plus petit)
           pt: el.pt || (feature ? d3.geoCentroid(feature) : null)
         });
       }
@@ -100,24 +105,35 @@
       this.dessiner();
     }
 
+    // Montre une région du jeu de données ({ cadre, centre }), ou toute la carte si null
+    definirZone(zone) {
+      if (zone === this.zone) return;
+      this.zone = zone;
+      this.visee = null;
+      this.forcerVueInitiale = true;
+      this.dessiner();
+    }
+
     dessiner() {
       const W = this.conteneur.clientWidth, H = this.conteneur.clientHeight;
       if (!W || !H) return;
       // Si la carte était zoomée (et la projection inchangée), on garde le même endroit au centre après redessin.
       const ti = this.tInitial;
       const surVueInitiale = ti && Math.abs(this.t.k - ti.k) < 0.01 && Math.abs(this.t.x - ti.x) < 2 && Math.abs(this.t.y - ti.y) < 2;
-      const garder = this.proj && this.t.k > 1 && !surVueInitiale && this.projDessinee === this.projectionId
+      const garder = this.proj && this.t.k > 1 && !surVueInitiale && !this.forcerVueInitiale && this.projDessinee === this.projectionId
         ? { centre: this.proj.invert(this.t.invert([this.W / 2, this.H / 2])), k: this.t.k } : null;
+      this.forcerVueInitiale = false;
       this.projDessinee = this.projectionId;
       this.W = W; this.H = H;
       this.svg.attr("viewBox", "0 0 " + W + " " + H).attr("width", W).attr("height", H);
 
       const m = 6;
+      const lon0 = this.zone && this.zone.centre ? this.zone.centre : 0;
       if (this.projectionId === "mercator") {
-        this.proj = d3.geoMercator().fitExtent([[m, m], [W - m, H - m]],
-          { type: "MultiPoint", coordinates: [[-179.9, -57], [179.9, 83]] });
+        this.proj = d3.geoMercator().rotate([-lon0, 0]).fitExtent([[m, m], [W - m, H - m]],
+          { type: "MultiPoint", coordinates: [[lon0 - 179.9, -57], [lon0 + 179.9, 83]] });
       } else {
-        this.proj = d3.geoEqualEarth().fitExtent([[m, m], [W - m, H - m]], { type: "Sphere" });
+        this.proj = d3.geoEqualEarth().rotate([-lon0, 0]).fitExtent([[m, m], [W - m, H - m]], { type: "Sphere" });
       }
       const path = d3.geoPath(this.proj);
       this.chemin = path;
@@ -157,18 +173,39 @@
       this.appliquerMarques();
       this.zoom.translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]]);
       this.svg.interrupt();
-      this.svg.call(this.zoom.transform, garder ? this.transformVers(garder.centre, garder.k) : this.vueInitiale());
+      // Un zoom automatique en cours (ou fini) vise un endroit précis : on y va directement,
+      // même s'il a été interrompu par le changement de taille (clavier du téléphone qui s'ouvre).
+      const t = this.visee ? this.transformVers(this.visee.lonlat, this.visee.k)
+        : garder ? this.transformVers(garder.centre, garder.k) : this.vueInitiale();
+      this.svg.call(this.zoom.transform, t);
     }
 
     // Vue de départ : toute la carte, sauf sur un écran en hauteur (téléphone) où la carte
     // remplit la hauteur et se parcourt en glissant, sinon elle serait minuscule.
+    // Avec une région : la région remplit l'écran.
     vueInitiale() {
       const b = this.chemin.bounds({ type: "Sphere" });
       const hCarte = b[1][1] - b[0][1];
-      if (!isFinite(hCarte) || hCarte >= this.H * 0.7) return (this.tInitial = d3.zoomIdentity);
-      const k = Math.min(5, this.H / hCarte);
+      const enHauteur = isFinite(hCarte) && hCarte < this.H * 0.7;
+      const kRemplir = enHauteur ? Math.min(5, this.H / hCarte) : 1;
+      const yCentre = (b[0][1] + b[1][1]) / 2;
+
+      const cadre = this.zone && this.zone.cadre;
+      if (cadre) {
+        // Bords du cadre échantillonnés (les méridiens et parallèles sont courbes en Equal Earth)
+        const pts = [];
+        const [[o, s], [e, n]] = cadre;
+        for (let lon = o; lon <= e; lon += 5) pts.push(this.proj([lon, s]), this.proj([lon, n]));
+        for (let lat = s; lat <= n; lat += 5) pts.push(this.proj([o, lat]), this.proj([e, lat]));
+        const xs = pts.filter(Boolean).map((p) => p[0]), ys = pts.filter(Boolean).map((p) => p[1]);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        const k = Math.max(kRemplir, Math.min(ZOOM_CADRAGE * 2, 0.95 * Math.min(this.W / (x1 - x0), this.H / (y1 - y0))));
+        return (this.tInitial = d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(k)
+          .translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+      }
+      if (!enHauteur) return (this.tInitial = d3.zoomIdentity);
       const x = this.proj([this.jeu.longitudeTelephone || 15, 0])[0];
-      return (this.tInitial = d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(k).translate(-x, -(b[0][1] + b[1][1]) / 2));
+      return (this.tInitial = d3.zoomIdentity.translate(this.W / 2, this.H / 2).scale(kRemplir).translate(-x, -yCentre));
     }
 
     // Transformation qui place un point (lon, lat) au centre avec le grossissement k
@@ -257,15 +294,23 @@
     // ---------- Zoom ----------
 
     zoomer(facteur) {
+      this.visee = null;
       this.svg.transition().duration(300).call(this.zoom.scaleBy, facteur);
     }
 
     reinitialiserZoom() {
+      this.visee = null;
       this.svg.transition().duration(500).call(this.zoom.transform, this.vueInitiale());
+    }
+
+    // Revient à la vue de départ si c'est le jeu qui avait zoomé (pas si le joueur a zoomé lui-même)
+    annulerZoomAuto() {
+      if (this.visee) this.reinitialiserZoom();
     }
 
     zoomVers(lonlat, k) {
       if (!this.proj(lonlat)) return;
+      this.visee = { lonlat: lonlat, k: k };
       this.svg.transition().duration(700).call(this.zoom.transform, this.transformVers(lonlat, k));
     }
 
@@ -294,10 +339,17 @@
         const a = d3.geoArea(p);
         if (a > aireMax) { aireMax = a; principal = p; }
       }
+      // Taille d'après l'encombrement à l'écran, centre d'après le centre géographique
+      // (plus fiable pour un pays coupé par la ligne de changement de date, comme la Russie)
       const b = this.chemin.bounds(principal);
       const dx = b[1][0] - b[0][0], dy = b[1][1] - b[0][1];
-      const k = Math.max(kMin, Math.min(ZOOM_CADRAGE, 0.3 / Math.max(dx / this.W, dy / this.H, 1e-6)));
-      this.zoomVers(this.proj.invert([(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2]), k);
+      const k = Math.max(kMin, Math.min(ZOOM_CADRAGE, 0.35 / Math.max(dx / this.W, dy / this.H, 1e-6)));
+      this.zoomVers(d3.geoCentroid(principal), k);
+    }
+
+    aire(id) {
+      const f = this.formes.get(id);
+      return f ? f.aire : 0;
     }
 
     // Vrai si l'élément est trop petit pour être vu sans zoom

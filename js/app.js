@@ -44,8 +44,10 @@
 
   // ---------- Accueil ----------
   function accueil() {
+    panneau.classList.remove("panneau-grand"); // le bouton ⌂ peut être touché depuis les réglages
     carte.effacerMarques();
     carte.auClic = function () {};
+    carte.definirZone(null);
     carte.reinitialiserZoom();
     panneau.innerHTML =
       "<p><strong>Bienvenue !</strong> Que voulez-vous faire ?</p>" +
@@ -57,7 +59,7 @@
       '<button class="bouton" data-action="explorer">Explorer la carte</button>' +
       "</div>";
     for (const mode of ["localiser", "nommer", "capitale", "capitaleVersElement"]) {
-      panneau.querySelector('[data-action="' + mode + '"]').addEventListener("click", () => jouer(mode));
+      panneau.querySelector('[data-action="' + mode + '"]').addEventListener("click", () => preparer(mode));
     }
     panneau.querySelector('[data-action="explorer"]').addEventListener("click", explorer);
   }
@@ -86,22 +88,87 @@
     };
   }
 
+  // ---------- Réglages avant la partie : région et difficulté ----------
+  const NB_QUESTIONS = 10;
+  const CLE_REGLAGES = "geojeu.reglages." + jeu.id;
+  let reglages = lireReglages();
+
+  // Mémorisés sur cet appareil pour la prochaine fois (sans conséquence si le navigateur refuse)
+  function lireReglages() {
+    try {
+      const r = JSON.parse(localStorage.getItem(CLE_REGLAGES));
+      if (r && jeu.regions.some((x) => x.id === r.region) && jeu.niveaux.some((x) => x.n === r.niveau)) return r;
+    } catch (e) { /* stockage indisponible */ }
+    return { region: "tout", niveau: 1 };
+  }
+  function enregistrerReglages() {
+    try { localStorage.setItem(CLE_REGLAGES, JSON.stringify(reglages)); } catch (e) { /* stockage indisponible */ }
+  }
+
+  function elementsDeLaPartie(niveau) {
+    return GeoJeu.selection.selectionner(jeu, { region: reglages.region, niveau: niveau, nb: NB_QUESTIONS }, (id) => carte.aire(id));
+  }
+
+  function preparer(idMode) {
+    const mode = GeoJeu.modes[idMode];
+    carte.effacerMarques();
+    carte.auClic = function () {};
+
+    function afficher() {
+      const region = jeu.regions.find((r) => r.id === reglages.region);
+      carte.definirZone(region); // on montre tout de suite la région choisie
+      panneau.classList.add("panneau-grand");
+      panneau.innerHTML =
+        '<p class="titre-ecran">' + esc(mode.nom(jeu)) + "</p>" +
+        '<p class="etiquette" id="etq-region">Région</p>' +
+        '<div class="choix" role="group" aria-labelledby="etq-region">' +
+        jeu.regions.map((r) => '<button data-region="' + r.id + '" aria-pressed="' + (r.id === reglages.region) + '">' +
+          esc(r.nom) + "</button>").join("") + "</div>" +
+        '<p class="etiquette" id="etq-niveau">Difficulté</p>' +
+        '<div class="choix" role="group" aria-labelledby="etq-niveau">' +
+        jeu.niveaux.map((nv) => '<button data-niveau="' + nv.n + '" aria-pressed="' + (nv.n === reglages.niveau) + '">' +
+          esc(nv.nom) + ' <span class="nombre">(' + elementsDeLaPartie(nv.n).length + ")</span></button>").join("") + "</div>" +
+        '<div class="rangee-boutons">' +
+        '<button class="bouton bouton-principal" data-action="commencer">Commencer</button>' +
+        '<button class="bouton" data-action="retour">Retour</button></div>';
+
+      panneau.querySelectorAll("[data-region]").forEach((b) => b.addEventListener("click", () => {
+        reglages.region = b.getAttribute("data-region");
+        afficher();
+      }));
+      panneau.querySelectorAll("[data-niveau]").forEach((b) => b.addEventListener("click", () => {
+        reglages.niveau = Number(b.getAttribute("data-niveau"));
+        afficher();
+      }));
+      panneau.querySelector('[data-action="commencer"]').addEventListener("click", () => {
+        panneau.classList.remove("panneau-grand");
+        enregistrerReglages();
+        jouer(idMode);
+      });
+      panneau.querySelector('[data-action="retour"]').addEventListener("click", accueil);
+    }
+    afficher();
+  }
+
   // ---------- Partie ----------
   function jouer(idMode) {
+    carte.reinitialiserZoom();
     const partie = new GeoJeu.Partie({
       jeu: jeu,
       carte: carte,
       panneau: panneau,
       mode: GeoJeu.modes[idMode],
-      elements: jeu.elements,
-      nbQuestions: 10,
+      elements: elementsDeLaPartie(reglages.niveau),
+      nbQuestions: NB_QUESTIONS,
       quandFini: (p) => {
         panneau.innerHTML =
           '<p class="verdict">Résultat : ' + p.score + " / " + p.questions.length + "</p>" +
           '<div class="rangee-boutons">' +
           '<button class="bouton bouton-principal" data-action="rejouer">Rejouer</button>' +
+          '<button class="bouton" data-action="reglages">Changer de région ou de difficulté</button>' +
           '<button class="bouton" data-action="accueil">Accueil</button></div>';
         panneau.querySelector('[data-action="rejouer"]').addEventListener("click", () => jouer(idMode));
+        panneau.querySelector('[data-action="reglages"]').addEventListener("click", () => preparer(idMode));
         panneau.querySelector('[data-action="accueil"]').addEventListener("click", accueil);
       }
     });

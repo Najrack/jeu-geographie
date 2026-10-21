@@ -108,6 +108,7 @@
     nom: function (jeu) { return "Où se trouve " + jeu.libelles.ceElement + " ?"; },
 
     poser: function (partie, el) {
+      partie.carte.annulerZoomAuto();
       choisirSurCarte(partie,
         '<p class="consigne">Trouvez sur la carte :</p><p class="question-nom">' + esc(el.nom) + "</p>",
         (clic) => this.repondre(partie, el, clic));
@@ -269,6 +270,7 @@
       const lib = partie.jeu.libelles;
       // Pour les éléments à plusieurs capitales, on en demande une au hasard
       const capitale = el.cap[Math.floor(Math.random() * el.cap.length)][0];
+      partie.carte.annulerZoomAuto();
       choisirSurCarte(partie,
         '<p class="consigne">De quel ' + esc(lib.element) + " est-ce la " + esc(lib.capitale) + " ?</p>" +
         '<p class="question-nom">' + esc(capitale) + "</p>",
@@ -298,6 +300,27 @@
     }
   };
 
+  // ---------- Choix des éléments d'une partie ----------
+
+  function dansRegion(el, region) {
+    return !region || region === "tout" || el.cont === region || el.aussi === region;
+  }
+
+  // Éléments de la région jusqu'au niveau demandé (champ n : 1 = très connu, 3 = difficile).
+  // S'il y en a moins que nb (ex. Océanie au niveau 1 : seulement 2 pays), on complète
+  // avec les plus faciles puis les plus grands des niveaux suivants.
+  function selectionner(jeu, reglages, aireDe) {
+    const region = jeu.elements.filter((e) => dansRegion(e, reglages.region));
+    const choisis = region.filter((e) => (e.n || 1) <= reglages.niveau);
+    if (choisis.length < reglages.nb) {
+      const reste = region.filter((e) => (e.n || 1) > reglages.niveau)
+        .sort((a, b) => (a.n || 1) - (b.n || 1) || aireDe(b.id) - aireDe(a.id));
+      choisis.push(...reste.slice(0, reglages.nb - choisis.length));
+    }
+    return choisis;
+  }
+
   GeoJeu.Partie = Partie;
+  GeoJeu.selection = { dansRegion: dansRegion, selectionner: selectionner };
   GeoJeu.outils = { esc: esc, melanger: melanger, texteDistance: texteDistance };
 })();

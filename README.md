@@ -20,6 +20,7 @@ clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », p
 - « Quel est ce pays ? » : un pays est coloré en orange et la carte se cadre dessus ; on tape son nom. Les accents, majuscules, tirets et petites fautes sont tolérés (« kirgizistan », « etats unis », « usa » sont acceptés), mais un autre pays existant est refusé (« Irak » pour l'Iran) et montré sur la carte. « Je ne sais pas » donne la réponse.
 - « Quelle est sa capitale ? » : le pays est nommé et coloré, on tape sa capitale (mêmes tolérances). Pour les pays à plusieurs capitales (Bolivie, Afrique du Sud…), chacune est acceptée. Si on donne la capitale d'un autre pays, ce pays est montré.
 - « De quel pays est cette capitale ? » : une capitale est donnée, on touche son pays sur la carte (sélection puis validation).
+- Avant chaque partie : choix de la **région** (Monde, Europe, Afrique, Asie, Amériques, Océanie ; la carte se cadre aussitôt dessus) et de la **difficulté** (« Les plus connus », « Connus et moyens », « Tous les pays »). Le nombre de pays concernés est affiché. S'il y en a moins de 10 (Océanie), le jeu complète avec les plus grands pays du niveau suivant. Ces choix sont retenus sur l'appareil.
 - Un toucher qui suit de près un déplacement ou un zoom de la carte est ignoré, pour éviter les réponses involontaires.
 
 ## Mettre en ligne et partager

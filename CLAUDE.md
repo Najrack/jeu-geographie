@@ -21,11 +21,11 @@ Il préfère qu'on prenne des initiatives et qu'on travaille de façon autonome 
 - 193 membres de l'ONU + Vatican, Palestine, Kosovo, Taïwan, chacun avec une mention « statut particulier ».
 - Somaliland rattaché à la Somalie, Chypre du Nord à Chypre, Hong Kong et Macao à la Chine, Åland à la Finlande.
 - Sahara occidental, Groenland et autres territoires : affichés en gris hachuré, non jouables.
-- Cas de capitales délicats (Israël, Palestine, Bolivie, Afrique du Sud…) : à faire valider à l'étape des capitales.
+- Capitales délicates (validé) : Israël = Jérusalem (note Tel-Aviv) ; Palestine = Jérusalem-Est ou Ramallah ; Bolivie, Afrique du Sud, Sri Lanka, Eswatini = toutes leurs capitales officielles ; sièges de gouvernement ou capitales économiques (La Haye, Abidjan, Cotonou, Putrajaya…) seulement en note.
 
 ## Étapes de la phase 1
 1. Plan ✔ 2. Carte, zoom, projections ✔ 3. Mode « où est ce pays » ✔ (sélection puis validation) 4. Mode saisie du nom ✔ (`js/moteur/reponses.js`)
-5. Capitales dans les deux sens ✔ (cas délicats en attente de validation) 6. Pastilles micro-États ✔ 7. Régions + difficulté 8. Répétition espacée
+5. Capitales dans les deux sens ✔ (choix des cas délicats validés le 21/10/2026 : plusieurs réponses seulement pour les capitales multiples officielles) 6. Pastilles micro-États ✔ 7. Régions + difficulté ✔ (champ `n` des éléments, `regions`/`niveaux` dans config.js) 8. Répétition espacée
 9. Bilan + carte de maîtrise 10. Accueil épuré, niveaux Facile/Moyen/Expert, aide, profils, export/import
 11. Défi du jour (série tirée de la date, résultat à partager en texte) 12. PWA hors ligne + mise en ligne
 
