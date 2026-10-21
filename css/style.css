@@ -142,6 +142,8 @@ svg.carte { position: absolute; inset: 0; display: block; touch-action: none; us
   background: #fff; color: var(--primaire); font-weight: 600;
 }
 .bouton-principal { background: var(--primaire); color: var(--primaire-texte); }
+.bouton:disabled { opacity: .4; cursor: default; }
+.aide-validation { font-size: .85rem; color: var(--texte-doux); }
 .bouton:focus-visible, .bouton-icone:focus-visible, .interrupteur button:focus-visible { outline: 3px solid var(--cible); outline-offset: 2px; }
 .rangee-boutons { display: flex; flex-wrap: wrap; gap: .6rem; }
 .rangee-boutons .bouton { flex: 1 1 12rem; }

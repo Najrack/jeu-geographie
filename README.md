@@ -16,7 +16,8 @@ clic droit sur `outils/serveur-local.ps1` → « Exécuter avec PowerShell », p
 - Deux types de carte : « Tailles réelles » (Equal Earth) et « Classique » (Mercator).
 - Des pastilles pour les tout petits pays (Vatican, Monaco, Luxembourg, Maldives…). Quand plusieurs sont collées, toucher l'une d'elles zoome sur la zone.
 - « Explorer la carte » : touchez un pays pour voir son nom et sa capitale.
-- « Où se trouve ce pays ? » : 10 pays au hasard à trouver sur la carte. En cas d'erreur, le jeu affiche le bon pays, le nom du pays touché et la distance.
+- « Où se trouve ce pays ? » : 10 pays au hasard à trouver sur la carte. Un premier toucher sélectionne le pays (en orange) ; on confirme avec « Valider » ou en le touchant une seconde fois. En cas d'erreur, le jeu affiche le bon pays, le nom du pays choisi et la distance.
+- Un toucher qui suit de près un déplacement ou un zoom de la carte est ignoré, pour éviter les réponses involontaires.
 
 ## Mettre en ligne et partager
 

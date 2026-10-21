@@ -6,6 +6,7 @@
   const RAYON_TOUCHER = 15;   // rayon de la zone qu'on peut toucher du doigt (px)
   const ECART_GROUPE = 22;    // deux pastilles plus proches que ça (px) : on zoome au lieu de choisir
   const ZOOM_MAX = 400;
+  const DELAI_APRES_GESTE = 350; // ms pendant lesquelles un clic après un déplacement est ignoré
   const RAYON_TERRE_KM = 6371;
 
   class Carte {
@@ -32,8 +33,16 @@
 
       this.zoom = d3.zoom()
         .scaleExtent([1, ZOOM_MAX])
-        .clickDistance(6)
-        .on("zoom", (e) => this.surZoom(e.transform));
+        .clickDistance(4)
+        .on("start", (e) => { this.tDebutGeste = e.transform; })
+        .on("zoom", (e) => this.surZoom(e.transform))
+        .on("end", (e) => {
+          // Un vrai déplacement ou zoom de la main : les clics qui suivent de près sont ignorés
+          const t0 = this.tDebutGeste;
+          if (e.sourceEvent && t0 && (Math.hypot(e.transform.x - t0.x, e.transform.y - t0.y) > 8 || e.transform.k !== t0.k)) {
+            this.finGeste = Date.now();
+          }
+        });
       this.svg.call(this.zoom).on("dblclick.zoom", null);
       this.svg.on("click", (e) => this.surClic(e));
 
@@ -187,6 +196,7 @@
 
     surClic(e) {
       if (e.defaultPrevented) return; // fin d'un glisser : pas un clic
+      if (this.finGeste && Date.now() - this.finGeste < DELAI_APRES_GESTE) return;
       const ecran = d3.pointer(e, this.svg.node());
       let lonlat = this.proj.invert(this.t.invert(ecran));
       if (!lonlat || !isFinite(lonlat[0]) || Math.abs(lonlat[0]) > 180 || Math.abs(lonlat[1]) > 90) lonlat = null;

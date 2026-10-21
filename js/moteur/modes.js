@@ -75,28 +75,52 @@
     }
   }
 
+  // Réponse en touchant la carte, en deux temps pour éviter les réponses involontaires :
+  // un premier toucher sélectionne l'élément, on confirme avec le bouton ou en le touchant à nouveau.
+  function choisirSurCarte(partie, htmlQuestion, valider) {
+    const carte = partie.carte;
+    const lib = partie.jeu.libelles;
+    let choix = null;
+    partie.afficher(htmlQuestion +
+      '<div class="rangee-boutons"><button class="bouton bouton-principal" data-action="valider" disabled>Valider</button></div>' +
+      '<p class="aide-validation">Touchez ' + esc(lib.unElement) + " puis validez, ou touchez-le une seconde fois.</p>");
+    const bouton = partie.panneau.querySelector('[data-action="valider"]');
+
+    function confirmer() {
+      if (!choix) return;
+      carte.auClic = function () {};
+      valider(choix);
+    }
+    bouton.addEventListener("click", confirmer);
+
+    carte.auClic = (clic) => {
+      if (choix && clic.id === choix.id) return confirmer();
+      if (choix) carte.marquer(choix.id, null);
+      choix = clic.id ? clic : null; // toucher la mer ou un territoire non jouable annule la sélection
+      if (choix) carte.marquer(choix.id, "choisi");
+      bouton.disabled = !choix;
+    };
+  }
+
   // ---------- Mode « Où se trouve… ? » : on donne un nom, le joueur touche la carte ----------
   GeoJeu.modes.localiser = {
     nom: function (jeu) { return "Où se trouve " + jeu.libelles.ceElement + " ?"; },
 
     poser: function (partie, el) {
-      partie.afficher('<p class="consigne">Touchez sur la carte :</p>' +
-        '<p class="question-nom">' + esc(el.nom) + "</p>");
-      partie.carte.auClic = (clic) => this.repondre(partie, el, clic);
+      choisirSurCarte(partie,
+        '<p class="consigne">Trouvez sur la carte :</p><p class="question-nom">' + esc(el.nom) + "</p>",
+        (clic) => this.repondre(partie, el, clic));
     },
 
     repondre: function (partie, el, clic) {
-      if (!clic.id && !clic.lonlat) return; // clic hors du globe : on ignore
       const carte = partie.carte;
-      carte.auClic = function () {};
       carte.marquer(el.id, "juste");
       let html;
       if (clic.id === el.id) {
         html = '<p class="verdict">✓ Bravo !</p><p><strong>' + esc(el.nom) + "</strong> est bien ici.</p>";
       } else {
-        if (clic.id) carte.marquer(clic.id, "faux");
-        const touche = clic.id ? esc(clic.element.nom) : clic.territoire ? esc(clic.territoire) : "la mer";
-        html = '<p class="verdict">✗ Raté</p><p>Vous avez touché : <strong>' + touche + "</strong>.</p>" +
+        carte.marquer(clic.id, "faux");
+        html = '<p class="verdict">✗ Raté</p><p>Vous avez choisi : <strong>' + esc(clic.element.nom) + "</strong>.</p>" +
           "<p><strong>" + esc(el.nom) + "</strong> (en bleu) était " + texteDistance(carte.distanceKm(el.id, clic.lonlat)) + ".</p>";
         if (carte.estPetit(el.id)) carte.zoomSur(el.id, 12);
       }
